@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
+import { useStreamingMetrics } from "../../lib/hooks/useStreamingMetrics";
 
 export default function PromptCard() {
   const [model, setModel] = useState("openai/gpt-5");
@@ -8,6 +9,9 @@ export default function PromptCard() {
   const [loading, setLoading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const { recordMetric } = useStreamingMetrics();
+  const startTimeRef = useRef<number>(0);
+  const firstTokenTimeRef = useRef<number>(0);
 
   const resetAbort = () => {
     if (abortRef.current) {
@@ -23,6 +27,11 @@ export default function PromptCard() {
     setAnswer("");
     setLoading(true);
     setStreaming(false);
+    startTimeRef.current = Date.now();
+    firstTokenTimeRef.current = 0;
+    let wasAborted = false;
+    let tokenCount = 0;
+
     try {
       if (!supportsStream) {
         const res = await fetch("/api/chat", {
@@ -33,6 +42,16 @@ export default function PromptCard() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setAnswer(data.answer ?? "");
+
+        // Record non-streaming metric
+        recordMetric({
+          model,
+          latency: Date.now() - startTimeRef.current,
+          totalDuration: Date.now() - startTimeRef.current,
+          tokensGenerated: (data.answer ?? "").split(/\s+/).length,
+          wasAborted: false,
+          status: "success",
+        });
         return;
       }
 
@@ -71,25 +90,56 @@ export default function PromptCard() {
               done = true;
               break;
             }
+            // Record first token latency
+            if (firstTokenTimeRef.current === 0) {
+              firstTokenTimeRef.current = Date.now();
+            }
+            tokenCount++;
             setAnswer((prev) => prev + token);
           } else {
             // Raw token fallback (no SSE prefix)
+            if (firstTokenTimeRef.current === 0) {
+              firstTokenTimeRef.current = Date.now();
+            }
+            tokenCount++;
             setAnswer((prev) => prev + trimmed);
           }
         }
       }
+
+      // Record streaming metric
+      recordMetric({
+        model,
+        latency: firstTokenTimeRef.current - startTimeRef.current,
+        totalDuration: Date.now() - startTimeRef.current,
+        tokensGenerated: tokenCount,
+        wasAborted: false,
+        status: "success",
+      });
     } catch (err) {
       // If user aborted, surface a calm message
-      if ((err as any)?.name === "AbortError") {
+      const isAborted = (err as any)?.name === "AbortError";
+      if (isAborted) {
+        wasAborted = true;
         setAnswer((prev) => prev || "Stream aborted");
       } else {
         setAnswer(`Error: ${(err as Error).message}`);
       }
+
+      // Record error metric
+      recordMetric({
+        model,
+        latency: firstTokenTimeRef.current - startTimeRef.current,
+        totalDuration: Date.now() - startTimeRef.current,
+        tokensGenerated: tokenCount,
+        wasAborted,
+        status: isAborted ? "aborted" : "error",
+      });
     } finally {
       setStreaming(false);
       setLoading(false);
     }
-  }, [model, prompt]);
+  }, [model, prompt, recordMetric]);
 
   const abort = useCallback(() => {
     abortRef.current?.abort();
