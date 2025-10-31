@@ -7,6 +7,7 @@ import ShareButton from "@/components/ShareButton";
 import MobileCreateDock from "@/components/MobileCreateDock";
 
 import HeroAurora from "@/components/HeroAurora";
+import AgentFirstShowcase from "@/components/AgentFirstShowcase";
 import FeatureRail from "@/components/FeatureRail";
 import PersonaPreview from "@/components/PersonaPreview";
 import Pricing from "@/components/Pricing";
@@ -38,6 +39,7 @@ export default function Page() {
       </div>
 
       <HeroAurora />
+      <AgentFirstShowcase />
       <FeatureRail />
       <SocialProofStrip />
       <PersonaPreview />
