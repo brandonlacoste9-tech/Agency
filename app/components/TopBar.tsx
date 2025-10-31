@@ -40,6 +40,12 @@ export default function TopBar({
             onFocus={(e)=>e.currentTarget.select()}
             onKeyDown={(e)=>{ if(e.key==="Enter") onOpenPalette(); }}
           />
+          <a
+            href="/dashboard"
+            className="rounded-lg border px-3 py-1.5 text-sm hover:opacity-70 transition"
+            style={{background:"var(--card)", borderColor:"var(--border)", color:"var(--text)"}}
+            title="Creator Dashboard"
+          >📊 Dashboard</a>
           <button
             className="rounded-lg border px-3 py-1.5 text-sm"
             style={{background:"var(--card)", borderColor:"var(--border)", color:"var(--text)"}}
