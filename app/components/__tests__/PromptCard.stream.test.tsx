@@ -1,21 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import PromptCard from "@/components/PromptCard";
 
 /**
  * Streaming tests for PromptCard SSE support
  *
- * These tests are **SKIPPED** by default (it.skip) until you implement:
- * 1. A PromptCard component that streams from /api/chat?stream=1
- * 2. A data-testid="answer-stream" container for live tokens
- * 3. A data-testid="abort-stream" button to cancel in-flight requests
+ * PromptCard component:
+ * 1. Streams from /api/chat?stream=1
+ * 2. Has data-testid="answer-stream" container for live tokens
+ * 3. Has data-testid="abort-stream" button to cancel in-flight requests
  *
- * Once implemented, change `it.skip` → `it` to enable these tests.
+ * These tests are now ACTIVE (it - not it.skip).
  */
-
-// Mock component (placeholder until real PromptCard is built)
-// Remove this once app/components/PromptCard.tsx exists
-const PromptCard = () => <div data-testid="prompt-card">PromptCard placeholder</div>;
 
 // Helper: create a ReadableStream that yields chunks over time
 function streamChunks(chunks: string[], delay = 5) {
@@ -39,24 +36,23 @@ describe("PromptCard (SSE streaming)", () => {
   });
 
   /**
-   * SKIPPED: Unskip once streaming UI is live
+   * Streaming UI is live
    *
-   * Requires:
+   * PromptCard component provides:
    * - PromptCard component with streaming support
-   * - /api/chat endpoint that responds with Content-Type: text/event-stream
+   * - /api/chat endpoint integration with Content-Type: text/event-stream
    * - <div data-testid="answer-stream" aria-live="polite" />
    * - <button data-testid="abort-stream" /> to trigger AbortController.abort()
    * - fetch(`/api/chat?stream=1`, { signal: abortController.signal })
    */
-  it.skip("renders tokens incrementally from /api/chat?stream=1 and supports Abort", async () => {
+  it("renders tokens incrementally from /api/chat?stream=1 and supports Abort", async () => {
     const abortController = new AbortController();
 
-    // Mock the streaming response
+    // Mock the streaming response with SSE-formatted tokens
     const body = streamChunks([
-      'data: {"delta":"Par"}\n\n',
-      'data: {"delta":"is"}\n\n',
-      'data: {"delta":" is"}\n\n',
-      'data: {"delta":" the capital of France."}\n\n',
+      "data: Paris\n\n",
+      "data:  is\n\n",
+      "data:  the capital of France.\n\n",
       "data: [DONE]\n\n",
     ]);
 
@@ -101,12 +97,16 @@ describe("PromptCard (SSE streaming)", () => {
   });
 
   /**
-   * SKIPPED: Works with or without streaming
+   * Works with or without streaming
    *
    * Fallback behavior when /api/chat?stream=1 is unavailable
    * or component opts for non-streaming mode
    */
-  it.skip("falls back to non-streaming when ?stream unsupported", async () => {
+  it("falls back to non-streaming when ?stream unsupported", async () => {
+    // Mock ReadableStream as unavailable to force non-streaming path
+    const originalReadableStream = global.ReadableStream;
+    delete (global as any).ReadableStream;
+
     (global.fetch as any) = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ answer: "Paris is the capital of France." }),
@@ -123,14 +123,19 @@ describe("PromptCard (SSE streaming)", () => {
     await waitFor(() => {
       expect(screen.getByText(/Paris is the capital of France\./)).toBeInTheDocument();
     });
+
+    // Restore ReadableStream
+    if (originalReadableStream) {
+      (global as any).ReadableStream = originalReadableStream;
+    }
   });
 
   /**
-   * SKIPPED: Stream error handling
+   * Stream error handling
    *
    * Gracefully handles mid-stream errors (network, API, abort)
    */
-  it.skip("handles stream errors gracefully", async () => {
+  it("handles stream errors gracefully", async () => {
     (global.fetch as any) = vi.fn().mockRejectedValue(new Error("Network timeout"));
 
     render(<PromptCard />);
@@ -148,20 +153,20 @@ describe("PromptCard (SSE streaming)", () => {
   });
 
   /**
-   * SKIPPED: Abort mid-stream
+   * Abort mid-stream
    *
    * User clicks abort while response is streaming
    */
-  it.skip("stops appending tokens when abort is clicked during stream", async () => {
+  it("stops appending tokens when abort is clicked during stream", async () => {
     let resolveStream: (() => void) | null = null;
     const streamPromise = new Promise<void>((resolve) => {
       resolveStream = resolve;
     });
 
     const body = streamChunks([
-      'data: {"delta":"The"}\n\n',
-      'data: {"delta":" quick"}\n\n',
-      'data: {"delta":" brown"}\n\n',
+      "data: The\n\n",
+      "data:  quick\n\n",
+      "data:  brown\n\n",
       // More would follow but we abort
     ]);
 
