@@ -1,0 +1,61 @@
+# Copilot Coding Agent configuration for the adgenxai repository
+# This file provides repo-specific onboarding, constraints, and quality gates
+# for the automated Copilot coding agent. Adapt as needed.
+
+version: 1
+enabled: true
+
+onboarding:
+  welcome: |
+    You're working on adgenxai — a Next.js + TypeScript web app (TailwindCSS, Vitest).
+    Prefer minimal, well-tested changes. Follow the repo's scripts and quality gates.
+
+  repo_summary: |
+    - Framework: Next.js (app/ folder), TypeScript
+    - Build: `npm run build`
+    - Typecheck: `npm run typecheck`
+    - Tests: Vitest (see `vitest.config.ts` and `app/components/__tests__`)
+    - Common tasks: `npm run dev`, `npm run build`, `npm run typecheck`, `npm run test`
+
+instructions:
+  - role: agent
+    description: |
+      Make focused changes only after confirming affected files and tests. Prefer
+      edits in `app/` and `lib/` unless the issue is config-related. Avoid large
+      refactors without opening an issue first.
+
+  - role: quality-gates
+    checks:
+      - name: Type check
+        command: npm run typecheck
+      - name: Build
+        command: npm run build
+      - name: Unit tests (quick)
+        command: npm run test -- --run
+
+file_hints:
+  source_folders:
+    - app
+    - lib
+  tests:
+    - app/components/__tests__
+
+constraints:
+  - Keep changes minimal and localized
+  - Do not modify public/ or build output directories unless necessary
+  - Avoid network calls or secret exfiltration
+
+agent_preferences:
+  languages: ["typescript", "tsx", "javascript", "md"]
+  default_branch: main
+  contact: "brandonlacoste9-tech"
+
+ignore_paths:
+  - node_modules/**
+  - .next/**
+  - public/**
+  - netlify/**
+
+notes: |
+  If you need to make a larger change (refactor, dependency bump, or feature),
+  open an issue and propose a small plan; prefer small PRs with green typecheck and build.
