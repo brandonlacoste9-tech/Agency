@@ -1,0 +1,103 @@
+name: Phase 2 — Providers • Supabase • Auth (orchestrator)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths:
+      - "app/**"
+      - "lib/**"
+      - "docs/**"
+      - "mcp_servers/**"
+      - "agents/**"
+      - "netlify/functions/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+      - ".github/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  checks: write
+
+jobs:
+  ci:
+    name: Lint • Typecheck • Test • Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build --if-present
+
+  label:
+    name: Auto-label by paths
+    runs-on: ubuntu-latest
+    needs: [ci]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+  request-copilot-review:
+    name: Ask Copilot CCR + Coding Agent for fixes
+    runs-on: ubuntu-latest
+    needs: [label]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Install GitHub CLI
+        uses: cli/gh-action@v2
+
+      - name: Post CCR request comment (mentions @copilot)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api \
+            repos/${{ github.repository }}/issues/$PR_NUMBER/comments \
+            -f body='@copilot Please run **Code Review** with tool-calling.
+
+            Focus areas:
+            - Security (CodeQL findings, RLS enforcement)
+            - ESLint violations (blocking)
+            - Provider adapters: OpenAI + GitHub Models fallback (PR-3)
+            - Supabase data access + RLS adherence (PR-1/PR-5)
+            - Netlify Functions webhook patterns
+            - Mobile responsiveness (Aurora styles)
+
+            If fixes are safe, open **stacked PRs** with the changes and reference this PR in the description.'
+
+  brief-claude:
+    name: Ask Claude to propose diffs when CCR finds issues
+    runs-on: ubuntu-latest
+    needs: [request-copilot-review]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Install GitHub CLI
+        uses: cli/gh-action@v2
+      - name: Post Claude planning comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments \
+            -f body='@claude Please draft a concise plan + diffs for:
+
+            - **PR-3 Providers**: Real streaming via OpenAI with GitHub Models fallback (feature flags: AI_PROVIDER=openai|github)
+            - **PR-1 Supabase**: Replace mock reads with RPC/SQL views + real-time channels
+            - **PR-5 Auth**: Supabase Auth; enforce RLS; ensure all API routes check user ownership
+
+            Keep PRs < 400 LOC each, include tests & docs updates, follow Aurora theme patterns, and link to the **Phase-2** project.'
