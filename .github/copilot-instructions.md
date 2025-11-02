@@ -4,13 +4,14 @@
 AdGenXAI is a Next.js AI-powered advertising platform with a "Sensory Cortex" architecture. The system generates ads/reels using AI agents, publishes to social platforms via Netlify functions, and provides a polished aurora-themed UI. Think of it as a webhook-driven AI advertising automation platform.
 
 ## Architecture ("Sensory Cortex" Pattern)
-- **Frontend**: Next.js 15+ app with static export (`output: 'export'`) for Netlify hosting
+- **Frontend**: Next.js 14.2+ app with static export (`output: 'export'`) for Netlify hosting
 - **Backend**: Netlify Functions act as the "sensory cortex" - serverless webhooks that orchestrate AI agents
 - **AI Integration**: External "Bee Agent" API calls for content generation
 - **Platform Publishing**: Modular platform adapters in `lib/platforms/` (Instagram, TikTok, YouTube)
 - **Deployment**: Fully automated via "BEE-SHIP" batch scripts that commit → push → auto-deploy
+- **CI/CD**: GitHub Actions with CodeQL security scanning, auto-labeling, and Copilot code reviews
 - **Tech Stack**:
-  - Next.js 15 with App Router
+  - Next.js 14.2 with App Router
   - TypeScript (strict mode)
   - Tailwind CSS for styling
   - Framer Motion for animations
@@ -24,6 +25,7 @@ AdGenXAI is a Next.js AI-powered advertising platform with a "Sensory Cortex" ar
 npm run dev          # Start Next.js dev server
 npm run test:watch   # Run Vitest in watch mode
 npm run typecheck    # TypeScript validation
+npm run build        # Production build
 ```
 
 ### BEE-SHIP Deployment (Project Convention)
@@ -31,6 +33,9 @@ npm run typecheck    # TypeScript validation
 # One-click deploy - use the batch scripts:
 SHIP_BEE_SWARM_NOW.bat    # Complete deployment pipeline
 SHIP_IT_NOW_COMPLETE.bat  # Alternative deploy script
+
+# Manual deploy commands:
+npm run build && npm run deploy  # Build + Netlify deploy
 ```
 These scripts auto-create platform modules, commit changes, push to GitHub, and trigger Netlify auto-deploy.
 
@@ -39,6 +44,22 @@ These scripts auto-create platform modules, commit changes, push to GitHub, and 
 netlify dev  # Serves functions at /.netlify/functions/
 ```
 Test webhook endpoint: `POST /.netlify/functions/webhook` with JSON payload.
+
+### Repository Maintenance & Cleanup
+```bash
+# Branch cleanup (recommended monthly):
+git fetch --prune  # Remove stale remote references
+git branch --merged main | grep -vE '^(main|master)$' | xargs -r git branch -d  # Remove merged local branches
+gh pr list --state merged --limit 50 | grep "weeks ago\|months ago"  # Identify old merged PRs for cleanup
+
+# CI/CD health check:
+gh run list --limit 10  # Check recent workflow runs
+gh workflow list         # List all workflows
+
+# Test suite validation:
+npm run test:ci         # Full test suite with coverage
+npm run typecheck       # TypeScript validation
+```
 
 ## Project-Specific Conventions
 
@@ -334,6 +355,18 @@ FB_ACCESS_TOKEN=EAABxxx...
 - Asset storage for generated images/videos
 - Telemetry data storage for webhook analytics
 
+### CI/CD Pipeline (GitHub Actions)
+- **Security**: CodeQL security scanning on every push
+- **Testing**: Automated test suite runs on PRs
+- **Automation**: Auto-labeling PRs, Copilot code reviews
+- **Deployment**: Netlify auto-deploy on main branch push
+
+**Workflow files to check**:
+- `.github/workflows/codeql.yml` - Security scanning
+- `.github/workflows/test.yml` - Test automation
+- `.github/CODEOWNERS` - Code review assignments
+- `.github/pull_request_template.md` - PR templates
+
 ## Testing Strategy
 
 ### Testing Stack
@@ -500,286 +533,25 @@ export type TikTokVideoMetadata = {
 }
 ```
 
-## Styling Patterns
+## Repository Health & Maintenance
 
-### Tailwind + CSS Variables Approach
-The project combines Tailwind utilities with CSS custom properties for dynamic theming:
+### Branch Management
+- **Main branch**: Always deployable, protected with required reviews
+- **Feature branches**: Use descriptive names like `feature/command-palette` or `fix/auth-bug`
+- **Cleanup**: Regular pruning of merged branches (monthly recommended)
 
-**Theme Variables** (set by `lib/theme.ts`):
-```css
---bg: #ffffff;        /* Background color */
---card: #f8f9fa;      /* Card background */
---border: #e9ecef;    /* Border color */
---text: #212529;      /* Text color */
-```
+### Pull Request Guidelines
+- **Size**: Keep PRs focused and reviewable (< 500 lines typically)
+- **Testing**: All PRs must pass test suite and type checking
+- **Reviews**: Use CODEOWNERS for automatic reviewer assignment
+- **Copilot**: Request Copilot code reviews for AI-assisted feedback
 
-**Usage in Components**:
-```typescript
-<div
-  className="rounded-xl border p-6"
-  style={{
-    background: "var(--card)",
-    borderColor: "var(--border)",
-    color: "var(--text)"
-  }}
->
-  {/* Component content */}
-</div>
-```
+### Security & Quality
+- **CodeQL**: Automated security scanning on all commits
+- **Dependencies**: Regular updates via Dependabot
+- **Testing**: Maintain > 80% test coverage for critical paths
+- **Type Safety**: Strict TypeScript mode enforced
 
-### Aurora Gradient Pattern
-```typescript
-// Hero gradient background
-<div className="absolute -top-24 -left-24 h-[80vh] w-[90vw] rounded-full blur-3xl
-                bg-[radial-gradient(60%_60%_at_40%_40%,rgba(53,227,255,.28),transparent)]" />
-```
+---
 
-### Responsive Design
-```typescript
-// Mobile-first with md: breakpoint
-<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-  <input className="hidden md:block w-64 rounded-lg" />
-</div>
-```
-
-### Shadow Patterns
-```typescript
-// Aurora-themed shadows
-className="shadow-[0_8px_40px_rgba(53,227,255,.35)]"
-className="shadow-[0_10px_60px_rgba(124,77,255,.2)]"
-```
-
-## Performance Considerations
-
-### Code Splitting
-- Next.js automatically code-splits pages
-- Use dynamic imports for heavy components:
-```typescript
-const HeavyComponent = dynamic(() => import('./HeavyComponent'), {
-  loading: () => <div>Loading...</div>
-});
-```
-
-### Image Optimization
-```typescript
-<img
-  src="/hero-aurora-studio@1792x1024.svg"
-  alt="Descriptive alt text"
-  loading="eager"  // or "lazy" for below-fold images
-  className="w-full rounded-2xl"
-/>
-```
-
-### Cleanup Patterns
-Always clean up event listeners and subscriptions:
-```typescript
-useEffect(() => {
-  const handler = (e: MouseEvent) => { /* ... */ };
-  window.addEventListener("mousemove", handler);
-  return () => window.removeEventListener("mousemove", handler); // Cleanup!
-}, []);
-```
-
-### Abort Requests on Unmount
-```typescript
-useEffect(() => {
-  const controller = new AbortController();
-
-  fetch("/api/data", { signal: controller.signal })
-    .then(res => res.json())
-    .then(setData);
-
-  return () => controller.abort(); // Cancel on unmount
-}, []);
-```
-
-## Common Pitfalls & Gotchas
-
-### 1. Static Export Limitations
-Since the app uses `output: 'export'`, you **cannot** use:
-- Server-side rendering (SSR)
-- Incremental Static Regeneration (ISR)
-- API routes in `app/api/` (use Netlify functions instead)
-
-### 2. Environment Variables
-- **Browser-accessible**: Must be prefixed with `NEXT_PUBLIC_`
-- **Server-only**: No prefix (only available in Netlify functions)
-- **Never commit**: Keep `.env` out of git
-
-### 3. Netlify Functions Context
-- Functions run in a serverless environment
-- No persistent state between invocations
-- Cold starts can add latency
-- Use environment variables from Netlify dashboard
-
-### 4. Type Safety
-Always type your state and props:
-```typescript
-// ❌ Bad
-const [data, setData] = useState(null);
-
-// ✅ Good
-const [data, setData] = useState<MyData | null>(null);
-```
-
-### 5. Async/Await Error Handling
-Always wrap async calls in try-catch:
-```typescript
-// ❌ Bad
-const data = await fetch("/api/data").then(r => r.json());
-
-// ✅ Good
-try {
-  const response = await fetch("/api/data");
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
-  setData(data);
-} catch (error) {
-  console.error("Fetch failed:", error);
-  setError(error);
-}
-```
-
-### 6. SSR vs Client Components
-Remember the "use client" directive for:
-- Browser APIs (window, localStorage)
-- Event handlers
-- State hooks
-- Framer Motion components
-
-## Key Files to Understand First
-- `netlify/functions/webhook.ts` - Main AI orchestration endpoint
-- `app/components/AuroraField.tsx` - Core visual theme component
-- `lib/theme.ts` - Theme management system
-- `lib/platforms/instagram.ts` - Platform publishing pattern
-- `app/components/CommandPalette.tsx` - Command palette pattern
-- `BEE_SHIP_QUICK_REF.md` - Deployment workflow documentation
-- `netlify.toml` - Critical routing config (`/api/*` → functions)
-- `tsconfig.json` - TypeScript path aliases
-- `vitest.config.ts` - Test configuration
-
-## Common Debugging
-- Check Netlify function logs for webhook errors
-- Verify environment variables in Netlify dashboard
-- Test platform APIs independently before integration
-- Use `netlify dev` for local function debugging
-- Monitor external Sensory Cortex health via `/health` endpoint
-
-## Security Best Practices
-
-### API Keys & Secrets
-- **Never hardcode** API keys in code
-- Use environment variables from Netlify dashboard
-- Keep `.env` files out of version control
-- Prefix browser-accessible vars with `NEXT_PUBLIC_`
-
-### Input Validation
-```typescript
-// Validate webhook payloads
-if (!payload.processing_id || typeof payload.prompt !== 'string') {
-  return {
-    statusCode: 400,
-    body: JSON.stringify({ error: 'Invalid payload' })
-  };
-}
-```
-
-### CORS Configuration
-Always include proper CORS headers in Netlify functions:
-```typescript
-const headers = {
-  'Access-Control-Allow-Origin': '*', // Or specific domain
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Content-Type': 'application/json',
-};
-```
-
-### Error Messages
-Don't leak sensitive information in error messages:
-```typescript
-// ❌ Bad
-throw new Error(`Database connection failed: ${dbPassword}`);
-
-// ✅ Good
-console.error('Database connection failed:', error); // Log internally
-throw new Error('Database connection failed'); // Generic message to user
-```
-
-## Project Naming Conventions
-- "Legendary" status responses indicate successful operations
-- "Sensory Cortex" refers to the distributed AI processing architecture
-- "Bee Agent" is the external AI content generation service
-- "Aurora" theme applies to all visual components
-- "BEE-SHIP" refers to the automated deployment scripts
-
-## Quick Reference
-
-### Essential Commands
-```bash
-# Development
-npm run dev              # Start dev server (localhost:3000)
-npm run build            # Build for production
-npm run typecheck        # TypeScript validation
-netlify dev              # Test functions locally
-
-# Testing
-npm run test             # Run tests once
-npm run test:watch       # Watch mode
-npm run test:ci          # With coverage
-
-# Deployment
-# Use BEE-SHIP batch scripts or push to GitHub (auto-deploys via Netlify)
-```
-
-### File Structure
-```
-adgenxai-2/
-├── app/                      # Next.js App Router
-│   ├── components/           # UI components
-│   │   ├── AuroraField.tsx   # Background animation
-│   │   ├── CommandPalette.tsx # Cmd+K palette
-│   │   ├── TopBar.tsx        # Navigation
-│   │   └── __tests__/        # Component tests
-│   ├── dashboard/            # Dashboard pages
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Home page
-├── lib/                      # Utilities & logic
-│   ├── platforms/            # Social platform APIs
-│   │   ├── instagram.ts
-│   │   ├── tiktok.ts
-│   │   └── youtube.ts
-│   └── theme.ts              # Theme management
-├── netlify/
-│   ├── functions/            # Serverless functions
-│   │   ├── webhook.ts        # Main AI endpoint
-│   │   └── health.ts         # Health check
-│   └── edge-functions/       # Edge functions (if any)
-├── public/                   # Static assets
-├── .github/
-│   └── copilot-instructions.md # This file!
-├── netlify.toml              # Netlify config
-├── next.config.mjs           # Next.js config
-├── tsconfig.json             # TypeScript config
-├── vitest.config.ts          # Test config
-└── package.json              # Dependencies
-```
-
-### Path Aliases (tsconfig.json)
-```typescript
-import Component from '@/components/Component';  // app/components/Component
-import { util } from '@/lib/util';               // lib/util
-import something from '@/anything';               // Root-level imports
-```
-
-### Color Palette
-- **Aurora Cyan**: `#35E3FF` - Primary accent
-- **Aurora Violet**: `#7C4DFF` - Secondary accent
-- **Aurora Gold**: `#FFD76A` - Tertiary accent
-- Theme variables: `--bg`, `--card`, `--border`, `--text`
-
-### Useful Resources
-- BEE_SHIP_QUICK_REF.md - Deployment guide
-- BEE_SHIP_COMPLETE_GUIDE.md - Complete deployment documentation
-- BUILD_SUMMARY.md - Build configuration summary
-- Netlify Functions docs: https://docs.netlify.com/functions/overview/
+*Last updated: November 2024 - Keep this file current with major architectural changes*
