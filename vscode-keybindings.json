@@ -1,0 +1,26 @@
+[
+  {
+    "key": "ctrl+alt+c",
+    "command": "workbench.action.tasks.runTask",
+    "args": "Claude: Review File",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+alt+t",
+    "command": "workbench.action.tasks.runTask", 
+    "args": "Claude: Generate Unit Test (Vitest)",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+alt+p",
+    "command": "workbench.action.tasks.runTask",
+    "args": "Claude: Produce Git Patch For File",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "ctrl+shift+alt+c",
+    "command": "workbench.action.tasks.runTask",
+    "args": "Claude: Autofix Pattern",
+    "when": "workspaceFolderCount != 0"
+  }
+]
