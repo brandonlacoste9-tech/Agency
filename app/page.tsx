@@ -8,6 +8,8 @@ import MobileCreateDock from "@/components/MobileCreateDock";
 
 import HeroAurora from "@/components/HeroAurora";
 import AgentFirstShowcase from "@/components/AgentFirstShowcase";
+import CampaignOrchestrationDemo from "@/components/CampaignOrchestrationDemo";
+import ComprehensiveFeatureShowcase from "@/components/ComprehensiveFeatureShowcase";
 import FeatureRail from "@/components/FeatureRail";
 import PersonaPreview from "@/components/PersonaPreview";
 import Pricing from "@/components/Pricing";
@@ -40,6 +42,13 @@ export default function Page() {
 
       <HeroAurora />
       <AgentFirstShowcase />
+      
+      {/* 🎯 Campaign Orchestration Demo - The Revolutionary Core */}
+      <CampaignOrchestrationDemo />
+      
+      {/* 🌟 NEW: Comprehensive Feature Showcase - Complete AI Ecosystem */}
+      <ComprehensiveFeatureShowcase />
+      
       <FeatureRail />
       <SocialProofStrip />
       <PersonaPreview />
