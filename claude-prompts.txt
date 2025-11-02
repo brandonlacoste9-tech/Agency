@@ -1,0 +1,20 @@
+# Prompt: review for Sora
+Scan the file {file_path} for references to "Sora", "sora-client", or other Sora-related APIs.
+For each usage, output:
+1) the line number and exact line,
+2) a one-sentence remediation plan (stub / replace with LongCat / remove),
+3) if code change is required, produce a git-style patch that performs that change.
+
+# Prompt: generate unit test for client
+Write a vitest unit test for {file_path} that:
+- stubs global fetch,
+- calls generateVideo and getGenerationStatus,
+- asserts that returned objects contain {id,status,url} keys and that status maps to 'succeeded' for mocked success.
+
+# Prompt: produce PR body
+Write a PR body describing the change:
+- short summary,
+- list of files modified,
+- how tested (npm test, npx netlify-cli build),
+- rollback instructions,
+- which env secrets were removed or added.
