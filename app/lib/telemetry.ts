@@ -77,21 +77,51 @@ class TelemetryClient {
       console.log('📊 Telemetry:', JSON.stringify(event, null, 2));
     }
 
-    // TODO: Integrate with your telemetry service (Supabase, Datadog, etc.)
-    // Example integrations:
+    // Send to external telemetry endpoint if configured
+    const endpoint = process.env.TELEMETRY_ENDPOINT;
+    const apiKey = process.env.TELEMETRY_API_KEY;
+
+    if (endpoint) {
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(apiKey && { 'Authorization': `Bearer ${apiKey}` })
+          },
+          body: JSON.stringify(event),
+          // 5 second timeout for telemetry
+          signal: AbortSignal.timeout(5000)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Telemetry endpoint returned ${response.status}`);
+        }
+      } catch (error) {
+        // Silent fail - telemetry should never break the app
+        if (process.env.DEBUG_TELEMETRY === 'true') {
+          console.warn('Telemetry endpoint error:', error);
+        }
+      }
+    }
+
+    // TODO: Add other integrations as needed:
     
     // Supabase:
     // await supabase.from('telemetry_events').insert(event);
     
-    // HTTP endpoint:
-    // await fetch('/api/telemetry', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(event)
+    // Datadog:
+    // await datadog.increment('video_generation.requests', 1, {
+    //   provider: event.properties.provider,
+    //   status: event.properties.status
     // });
     
-    // Third-party service:
-    // await analytics.track(event.event, event.properties);
+    // Sentry:
+    // Sentry.addBreadcrumb({
+    //   message: event.event,
+    //   data: event.properties,
+    //   timestamp: event.timestamp
+    // });
   }
 }
 
