@@ -1,0 +1,33 @@
+"PR-3: Providers":
+  - "app/api/chat/**"
+  - "lib/providers/**"
+  - "netlify/functions/webhook.ts"
+  - "docs/PROVIDER_INTEGRATION.md"
+  - "docs/INTEGRATION_QUICKSTART.md"
+
+"PR-1: Supabase":
+  - "lib/db/**"
+  - "lib/supabase/**"
+  - "app/dashboard/**"
+  - "docs/DATABASE_SCHEMA.md"
+  - "app/api/**"
+  - "netlify/functions/**"
+
+"PR-5: Auth":
+  - "lib/auth/**"
+  - "app/auth/**"
+  - "app/**/layout.tsx"
+  - "app/**/page.tsx"
+  - "docs/INTEGRATION_QUICKSTART.md"
+  - "middleware.ts"
+
+"Aurora Theme":
+  - "app/components/ui/**"
+  - "app/components/aurora/**"
+  - "app/globals.css"
+  - "tailwind.config.js"
+
+"BEE-SHIP":
+  - "deployment/**"
+  - "bee-ship/**"
+  - "netlify.toml"

@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Claude: Review File",
+      "type": "shell",
+      "command": "claude review \"${file}\" > \"${file}.claude.md\" && code --reuse-window \"${file}.claude.md\" || true",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Claude: Generate Unit Test (Vitest)",
+      "type": "shell",
+      "command": "claude generate-test \"${file}\" > \"${file}.claude.test.patch\" || true",
+      "presentation": {
+        "echo": true,
+        "reveal": "never",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "group": "test"
+    },
+    {
+      "label": "Claude: Produce Git Patch For File",
+      "type": "shell",
+      "command": "claude generate-patch \"${file}\" > \"${file}.claude.patch\" || true",
+      "presentation": {
+        "echo": true,
+        "reveal": "never",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Claude: Autofix Pattern",
+      "type": "shell",
+      "command": "./scripts/claude-autofix.sh",
+      "args": ["${input:pattern}"],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "new"
+      },
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "pattern",
+      "description": "Grep pattern to search for",
+      "default": "sora|sora-client",
+      "type": "promptString"
+    }
+  ]
+}
