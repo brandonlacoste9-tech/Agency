@@ -28,47 +28,90 @@ npm run typecheck    # TypeScript validation
 npm run build        # Production build
 ```
 
-## Copilot quick-reference — AdGenXAI (concise)
+### Local Testing with Netlify Functions
+```bash
+netlify dev          # Run Netlify functions locally (test webhooks)
+# POST to /.netlify/functions/<name> for testing
+```
 
-Short orientation
-- Frontend: Next.js (App Router) + Tailwind + Framer Motion (app/)
-- Backend/orchestration: Netlify functions + app/api/* serve as server endpoints and webhooks
-- AI: external "Bee Agent" API (BEE_API_URL) used for content generation
+## Essential Knowledge for AI Agents
 
-Where to look (high-value files/dirs)
-- app/ — React pages & components (app/components/*, app/api/*)
-- lib/platforms/ — platform adapters (instagram.ts, tiktok.ts) — follow the publishContent signature
-- netlify/functions/ and app/api/ — serverless webhook patterns and CORS header usage
-- docs/bee-ship/ & scripts/deployment/ — BEE-SHIP deploy conventions
-
-Key commands (dev & CI)
-- npm run dev           # Next dev server
-- netlify dev           # Run Netlify functions locally (test webhooks)
-- npm run build && npm run deploy  # manual build+deploy (project provides ship scripts too)
-- npm run typecheck     # TypeScript strict checks
-- npm run test / test:watch / test:ci  # Vitest suite
-
-Project conventions you must follow
-- TypeScript strict mode and path aliases (see tsconfig.json — use @/ components/imports)
-- Use "use client" for components with state, browser APIs or Framer Motion (e.g., TopBar.tsx)
-- Netlify function pattern: always include CORS headers + handle OPTIONS. Env var: NEXT_PUBLIC_SENSORY_CORTEX_URL
-- Platform adapter contract (example):
+### Architecture Patterns
+- **"use client"** directive: Required for components with state, browser APIs, or Framer Motion (see `TopBar.tsx`, `PromptCard.tsx`)
+- **Streaming Pattern**: AbortController with `abortRef` for cancellable AI agent calls (see `PromptCard.tsx` lines 15-20)
+- **Platform Adapter Contract**: All platform integrations follow same signature:
+  ```typescript
   export type PlatformConfig = { accountId: string; accessToken: string };
   export async function publishContent(config: PlatformConfig, content: any): Promise<{ publishedId: string }>
+  ```
 
-Testing & debugging tips
-- Unit tests use Vitest + @testing-library in jsdom. Tests live under app/components/__tests__ and similar folders.
-- To test server functions locally, run `netlify dev` and POST to /.netlify/functions/<name>
-- Use abortRef pattern (PromptCard.tsx) for cancellable fetches when making agent calls
+### Netlify Function Conventions (CRITICAL)
+- **Always include CORS headers** in all functions
+- **Handle OPTIONS method** for preflight requests
+- **Environment variables**: Use `NEXT_PUBLIC_SENSORY_CORTEX_URL` for frontend/function communication
+- **Error handling**: Return structured JSON with `{ error: string, details?: string }`
+- **Example pattern**: See `netlify/functions/post-to-instagram.ts`
 
-Environment and integrations
-- Look in netlify.toml and docs/ for required Netlify env vars: BEE_API_URL, BEE_API_KEY, SENSORY_CORTEX_URL, SUPABASE_*, INSTAGRAM_ACCOUNT_ID, FB_ACCESS_TOKEN
-- Social platform code in lib/platforms/ — Instagram uses Facebook Graph flow; TikTok/YouTube are implemented as adapters/stubs
+### File Structure Navigation
+- `app/` — React pages & components (App Router)
+  - `app/components/` — Reusable UI components
+  - `app/api/` — Server endpoints (complement Netlify functions)
+  - `app/components/__tests__/` — Component tests with accessibility checks
+- `lib/platforms/` — Platform adapters (Instagram, TikTok, YouTube)
+- `netlify/functions/` — Serverless webhook functions
+- `docs/bee-ship/` — BEE-SHIP deployment documentation
+- `scripts/deployment/` — Automated deployment scripts (.bat files)
 
-Editing guidelines for AI agents
-- Make minimal, focused PRs. Run `npm run typecheck` and `npm run test` before pushing.
-- If changing APIs or platform flows, add/modify a test in vitest and a short note in docs/ or the BEE-SHIP docs.
+### Testing Patterns
+- **Unit tests**: Vitest + @testing-library in jsdom environment
+- **Test naming**: `ComponentName.test.tsx` or `ComponentName.feature.test.tsx`
+- **Accessibility**: All components have a11y smoke tests (see `a11y.smoke.test.tsx`)
+- **Streaming tests**: Mock ReadableStream for testing streaming UI components
+- **Coverage**: Run `npm run test:ci` for coverage reports
 
-If anything above is unclear or you want a deeper example (e.g., a walkthrough for adding a new platform adapter), tell me which area and I will expand with step-by-step examples.
+### Configuration & Environment
+- **Static Export**: `next.config.mjs` has `output: 'export'` for Netlify
+- **Path Aliases**: Use `@/` imports (see `tsconfig.json` and `vitest.config.ts`)
+- **Required env vars**: `BEE_API_URL`, `BEE_API_KEY`, `INSTAGRAM_ACCOUNT_ID`, `FB_ACCESS_TOKEN`, `SUPABASE_*`
+- **Netlify redirects**: API routes redirect from `/api/*` to `/.netlify/functions/*`
+
+### BEE-SHIP Deployment System
+- **One-click deployment**: Use `.bat` scripts in `scripts/deployment/`
+- **Commit → Push → Auto-deploy**: GitHub Actions handle CI/CD pipeline
+- **Documentation**: See `docs/bee-ship/` for complete deployment guides
+- **Local testing**: Use `netlify dev` before shipping
+
+## Common Development Tasks
+
+### Adding a New Platform
+1. Create adapter in `lib/platforms/newplatform.ts` following the contract
+2. Add Netlify function in `netlify/functions/post-to-newplatform.ts`
+3. Add environment variables to `netlify.toml`
+4. Write tests in `__tests__/` directory
+5. Update documentation in `docs/`
+
+### Debugging Webhooks
+- Use `netlify dev` to test functions locally
+- Check browser network tab for CORS issues
+- Verify environment variables are set correctly
+- Test with `curl` or Postman for function endpoints
+
+### Component Development
+- Add `"use client"` for interactive components
+- Include accessibility attributes and ARIA labels
+- Write corresponding test in `__tests__/` directory
+- Use Framer Motion for animations with proper reduced motion support
+
+## TypeScript & Code Quality
+- **Strict mode**: All TypeScript errors must be resolved
+- **Path imports**: Use `@/components`, `@/lib` aliases
+- **No any types**: Use proper typing or unknown/object
+- **ESLint compliance**: Run `npm run typecheck` before committing
+
+## Critical Integration Points
+- **Instagram**: Uses Facebook Graph API v17.0 (two-step: create → publish)
+- **AI Agents**: External BEE API with streaming response handling
+- **Supabase**: Database integration for user data and analytics
+- **Netlify**: Static hosting with serverless functions for backend logic
 
 Last updated: 2025-11-02
