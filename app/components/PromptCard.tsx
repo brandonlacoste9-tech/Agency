@@ -45,12 +45,16 @@ export default function PromptCard() {
 
         // Record non-streaming metric
         recordMetric({
-          model,
-          latency: Date.now() - startTimeRef.current,
-          totalDuration: Date.now() - startTimeRef.current,
-          tokensGenerated: (data.answer ?? "").split(/\s+/).length,
-          wasAborted: false,
-          status: "success",
+          type: 'generation',
+          duration: Date.now() - startTimeRef.current,
+          success: true,
+          metadata: {
+            model,
+            latency: Date.now() - startTimeRef.current,
+            tokensGenerated: (data.answer ?? "").split(/\s+/).length,
+            wasAborted: false,
+            status: "success",
+          }
         });
         return;
       }
@@ -109,12 +113,17 @@ export default function PromptCard() {
 
       // Record streaming metric
       recordMetric({
-        model,
-        latency: firstTokenTimeRef.current - startTimeRef.current,
-        totalDuration: Date.now() - startTimeRef.current,
-        tokensGenerated: tokenCount,
-        wasAborted: false,
-        status: "success",
+        type: 'generation',
+        duration: Date.now() - startTimeRef.current,
+        success: true,
+        metadata: {
+          model,
+          latency: firstTokenTimeRef.current - startTimeRef.current,
+          totalDuration: Date.now() - startTimeRef.current,
+          tokensGenerated: tokenCount,
+          wasAborted: false,
+          status: "success",
+        }
       });
     } catch (err) {
       // If user aborted, surface a calm message
@@ -128,12 +137,17 @@ export default function PromptCard() {
 
       // Record error metric
       recordMetric({
-        model,
-        latency: firstTokenTimeRef.current - startTimeRef.current,
-        totalDuration: Date.now() - startTimeRef.current,
-        tokensGenerated: tokenCount,
-        wasAborted,
-        status: isAborted ? "aborted" : "error",
+        type: 'generation',
+        duration: Date.now() - startTimeRef.current,
+        success: false,
+        metadata: {
+          model,
+          latency: firstTokenTimeRef.current - startTimeRef.current,
+          totalDuration: Date.now() - startTimeRef.current,
+          tokensGenerated: tokenCount,
+          wasAborted,
+          status: isAborted ? "aborted" : "error",
+        }
       });
     } finally {
       setStreaming(false);
