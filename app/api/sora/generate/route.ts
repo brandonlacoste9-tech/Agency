@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { soraClient, SoraGenerationRequest } from "@/lib/sora/sora-client";
 import { telemetry, generateRequestId } from "@/lib/telemetry";
+import { selectVideoProvider } from "@/lib/providers/provider-selector";
 
 export const runtime = "nodejs";
 
@@ -15,8 +16,10 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { prompt, model, duration, quality, aspectRatio } = body as Partial<SoraGenerationRequest> & {
+    const { prompt, model, duration, quality, aspectRatio, mode = 'production', priority = 'quality' } = body as Partial<SoraGenerationRequest> & {
       aspectRatio?: string;
+      mode?: 'preview' | 'production';
+      priority?: 'speed' | 'quality' | 'cost';
     };
 
     // Validate input
@@ -48,12 +51,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Track request
+    const videoDuration = duration || 10;
+
+    // Use ProviderSelector to choose optimal provider
+    const providerSelection = selectVideoProvider(videoDuration, mode, priority);
+    
+    // Track provider selection for telemetry
     telemetry.trackVideoRequest({
       requestId,
-      provider: 'sora',
+      provider: providerSelection.provider.toLowerCase().replace(/[^a-z0-9]/g, '-'),
       prompt_length: prompt.length,
-      duration,
+      duration: videoDuration,
       model,
       quality,
       aspectRatio
@@ -63,18 +71,18 @@ export async function POST(req: NextRequest) {
     const request: SoraGenerationRequest = {
       prompt: prompt.trim(),
       model: (model as "sora-1" | "sora-1-hd") || "sora-1",
-      duration: duration as any,
+      duration: videoDuration as any,
       quality: quality as any,
       aspectRatio: aspectRatio as any,
     };
 
-    // Submit to Sora
+    // Submit to Sora (or selected provider)
     const job = await soraClient.generateVideo(request);
 
     // Track success
     telemetry.trackVideoResult({
       requestId,
-      provider: 'sora',
+      provider: providerSelection.provider.toLowerCase().replace(/[^a-z0-9]/g, '-'),
       status: 'queued',
       latency_ms: Date.now() - startTime
     });
@@ -84,7 +92,12 @@ export async function POST(req: NextRequest) {
       status: job.status,
       createdAt: job.createdAt,
       requestId,
-      message: "Video generation queued. Check status with /api/sora/status?jobId=...",
+      provider: providerSelection.provider,
+      estimatedCost: providerSelection.estimatedCost,
+      estimatedLatency: providerSelection.estimatedLatency,
+      selectionReason: providerSelection.reason,
+      fallbackProviders: providerSelection.fallbacks,
+      message: `Video generation queued with ${providerSelection.provider}. Check status with /api/sora/status?jobId=...`,
     });
   } catch (error) {
     // Track error
