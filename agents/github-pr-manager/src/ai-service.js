@@ -1,5 +1,4 @@
 // agents/github-pr-manager/src/ai-service.js
-import fetch from 'node-fetch';
 
 export class AIService {
   constructor(aiServiceUrl = 'http://localhost:8000') {

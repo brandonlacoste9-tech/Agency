@@ -1,6 +1,7 @@
 // agents/github-pr-manager/src/index.js
 import express from "express";
 import crypto from "crypto";
+import client from 'prom-client';
 import { Octokit } from "octokit";
 import { AIService } from "./ai-service.js";
 
@@ -25,6 +26,99 @@ if (!TOKEN) {
 const octokit = new Octokit({ auth: TOKEN });
 const aiService = new AIService(AI_SERVICE_URL);
 
+// Prometheus metrics setup
+const register = new client.Registry();
+
+// Default metrics (CPU, memory, etc.)
+client.collectDefaultMetrics({ register });
+
+// Custom metrics
+const webhookCounter = new client.Counter({
+  name: 'github_webhooks_total',
+  help: 'Total number of GitHub webhooks received',
+  labelNames: ['event', 'action', 'status'],
+  registers: [register]
+});
+
+const webhookDuration = new client.Histogram({
+  name: 'github_webhook_processing_duration_seconds',
+  help: 'Duration of webhook processing in seconds',
+  labelNames: ['event', 'action'],
+  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10],
+  registers: [register]
+});
+
+const queueGauge = new client.Gauge({
+  name: 'github_webhook_queue_length',
+  help: 'Current number of webhooks in processing queue',
+  registers: [register]
+});
+
+const aiAnalysisCounter = new client.Counter({
+  name: 'github_ai_analysis_total',
+  help: 'Total number of AI analyses performed',
+  labelNames: ['type', 'status'],
+  registers: [register]
+});
+
+const aiAnalysisDuration = new client.Histogram({
+  name: 'github_ai_analysis_duration_seconds',
+  help: 'Duration of AI analysis in seconds',
+  labelNames: ['type'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
+  registers: [register]
+});
+
+const processedPRsCounter = new client.Counter({
+  name: 'github_prs_processed_total',
+  help: 'Total number of PRs processed',
+  labelNames: ['action', 'status'],
+  registers: [register]
+});
+
+const processedIssuesCounter = new client.Counter({
+  name: 'github_issues_processed_total',
+  help: 'Total number of issues processed',
+  labelNames: ['action', 'status'],
+  registers: [register]
+});
+
+const errorCounter = new client.Counter({
+  name: 'github_agent_errors_total',
+  help: 'Total number of errors encountered',
+  labelNames: ['type', 'component'],
+  registers: [register]
+});
+
+const activeConnectionsGauge = new client.Gauge({
+  name: 'github_agent_active_connections',
+  help: 'Number of active connections',
+  registers: [register]
+});
+
+// Metrics update functions
+function updateQueueMetrics(queueLength) {
+  queueGauge.set(queueLength);
+}
+
+function recordWebhookProcessing(event, action, duration, status = 'success') {
+  webhookCounter.inc({ event, action, status });
+  if (duration) {
+    webhookDuration.observe({ event, action }, duration);
+  }
+}
+
+function recordAIAnalysis(type, duration, status = 'success') {
+  aiAnalysisCounter.inc({ type, status });
+  if (duration) {
+    aiAnalysisDuration.observe({ type }, duration);
+  }
+}
+
+function recordError(type, component) {
+  errorCounter.inc({ type, component });
+}
+
 app.use(express.json({
   verify: (req, res, buf) => {
     // keep raw body for signature verification
@@ -43,6 +137,41 @@ app.get("/health", (req, res) => {
   });
 });
 
+// Prometheus metrics endpoint
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', register.contentType);
+    const metrics = await register.metrics();
+    res.send(metrics);
+  } catch (error) {
+    recordError('metrics_export', 'prometheus');
+    res.status(500).send('Error generating metrics');
+  }
+});
+
+// Enhanced readiness check
+app.get('/ready', async (req, res) => {
+  const checks = {
+    timestamp: new Date().toISOString(),
+    status: 'ready',
+    checks: {
+      github_token: !!TOKEN,
+      webhook_secret: !!WEBHOOK_SECRET,
+      repository_configured: !!REPO,
+      ai_service_configured: !!AI_SERVICE_URL
+    }
+  };
+  
+  const allReady = Object.values(checks.checks).every(check => check);
+  
+  if (!allReady) {
+    checks.status = 'not_ready';
+    return res.status(503).json(checks);
+  }
+  
+  res.json(checks);
+});
+
 function verifySignature(req) {
   if (!WEBHOOK_SECRET) return true; // nothing to verify against
   const signature = req.headers["x-hub-signature-256"] || "";
@@ -54,23 +183,40 @@ function verifySignature(req) {
 }
 
 app.post("/webhook", async (req, res) => {
-  if (WEBHOOK_SECRET && !verifySignature(req)) {
-    safeLog("Webhook signature verification failed");
-    return res.status(401).send("Invalid signature");
-  }
-  
+  const startTime = Date.now();
   const event = req.headers["x-github-event"];
-  safeLog("Received webhook:", event);
+  const action = req.body?.action || 'unknown';
   
-  // Process webhook asynchronously
-  processWebhookAsync(event, req.body).catch(err => {
-    safeLog("Webhook processing error:", err.message || err);
-  });
+  // Track active connections
+  activeConnectionsGauge.inc();
+  
+  try {
+    if (WEBHOOK_SECRET && !verifySignature(req)) {
+      safeLog("Webhook signature verification failed");
+      recordWebhookProcessing(event || 'unknown', action, (Date.now() - startTime) / 1000, 'auth_failed');
+      recordError('webhook_auth_failed', 'signature_verification');
+      return res.status(401).send("Invalid signature");
+    }
 
-  return res.status(202).send("Accepted");
-});
+    safeLog("Received webhook:", event);
 
-async function processWebhookAsync(event, payload) {
+    // Process webhook asynchronously
+    processWebhookAsync(event, req.body).catch(err => {
+      const duration = (Date.now() - startTime) / 1000;
+      recordWebhookProcessing(event || 'unknown', action, duration, 'error');
+      recordError('webhook_processing', 'async_handler');
+      safeLog("Webhook processing error:", err.message || err);
+    });
+
+    const duration = (Date.now() - startTime) / 1000;
+    recordWebhookProcessing(event || 'unknown', action, duration, 'accepted');
+    
+    return res.status(202).send("Accepted");
+    
+  } finally {
+    activeConnectionsGauge.dec();
+  }
+});async function processWebhookAsync(event, payload) {
   try {
     if (event === "pull_request") {
       const pr = payload.pull_request;
@@ -95,14 +241,17 @@ async function processWebhookAsync(event, payload) {
 }
 
 async function analyzePRWithAI(pr, repository) {
+  const startTime = Date.now();
+  
   if (!ENABLE_AI_ANALYSIS) {
     safeLog(`AI analysis disabled for PR #${pr.number}`);
+    recordAIAnalysis('pr', (Date.now() - startTime) / 1000, 'disabled');
     return;
   }
 
   try {
     safeLog(`Starting AI analysis for PR #${pr.number}`);
-    
+
     // Get file changes
     const files = await octokit.rest.pulls.listFiles({
       owner: repository.owner.login,
@@ -133,12 +282,18 @@ async function analyzePRWithAI(pr, repository) {
       await postAIReviewComment(repository, pr.number, prData, analysis);
     }
 
+    const duration = (Date.now() - startTime) / 1000;
+    recordAIAnalysis('pr', duration, 'success');
+    processedPRsCounter.inc({ action: 'analyzed', status: 'success' });
+
   } catch (error) {
+    const duration = (Date.now() - startTime) / 1000;
+    recordAIAnalysis('pr', duration, 'error');
+    recordError('ai_analysis', 'pr');
+    processedPRsCounter.inc({ action: 'analyzed', status: 'error' });
     safeLog(`AI analysis failed for PR #${pr.number}:`, error.message);
   }
-}
-
-async function analyzeIssueWithAI(issue, repository) {
+}async function analyzeIssueWithAI(issue, repository) {
   if (!ENABLE_AI_ANALYSIS) {
     safeLog(`AI analysis disabled for issue #${issue.number}`);
     return;
