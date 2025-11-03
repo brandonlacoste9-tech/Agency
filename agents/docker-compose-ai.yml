@@ -39,9 +39,10 @@ services:
       - MODEL_NAME=ai/smollm2
       - MAX_TOKENS=2048
       - TEMPERATURE=0.3
+      - TOP_P=0.9
+      - FREQUENCY_PENALTY=0.1
+      - PRESENCE_PENALTY=0.1
       - API_KEY=${AI_API_KEY:-}
-    models:
-      - llm
     volumes:
       - ai_cache:/app/cache
     restart: unless-stopped
@@ -114,16 +115,6 @@ services:
     depends_on:
       - prometheus
     restart: unless-stopped
-
-models:
-  llm:
-    model: ai/smollm2
-    parameters:
-      temperature: 0.3
-      max_tokens: 2048
-      top_p: 0.9
-      frequency_penalty: 0.1
-      presence_penalty: 0.1
 
 volumes:
   redis_data:

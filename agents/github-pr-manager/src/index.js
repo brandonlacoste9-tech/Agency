@@ -4,6 +4,9 @@ import crypto from "crypto";
 import client from 'prom-client';
 import { Octokit } from "octokit";
 import { AIService } from "./ai-service.js";
+import HealthMonitor from "./health-monitor.js";
+import CircuitBreaker from "./circuit-breaker.js";
+import { RetryLogic, RetryableError, createRetryable } from "./retry-logic.js";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
@@ -14,9 +17,72 @@ const PROMOTE_DRAFTS = (process.env.PROMOTE_DRAFTS || "false").toLowerCase() ===
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || "http://localhost:8000";
 const ENABLE_AI_ANALYSIS = (process.env.ENABLE_AI_ANALYSIS || "true").toLowerCase() === "true";
 
+// Initialize resilience components
+const healthMonitor = new HealthMonitor({
+  checkInterval: 30000, // 30 seconds
+  alertThresholds: {
+    memoryUsage: 0.85,
+    responseTime: 5000,
+    errorRate: 0.1
+  }
+});
+
+const aiCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeout: 60000, // 1 minute
+  expectedErrors: ['RATE_LIMIT', 'TIMEOUT']
+});
+
+const githubCircuitBreaker = new CircuitBreaker({
+  failureThreshold: 3,
+  resetTimeout: 30000, // 30 seconds
+  expectedErrors: ['RATE_LIMIT']
+});
+
+// Create retryable versions of key operations
+const retryableGitHubCall = createRetryable(
+  async (operation) => await operation(),
+  {
+    maxAttempts: 3,
+    baseDelay: 1000,
+    retryableErrors: ['ECONNRESET', 'RATE_LIMIT']
+  }
+);
+
+const retryableAICall = createRetryable(
+  async (operation) => await operation(),
+  {
+    maxAttempts: 2,
+    baseDelay: 2000,
+    maxDelay: 10000
+  }
+);
+
 function safeLog(...args) {
-  // Avoid logging secrets
-  console.log(new Date().toISOString(), ...args);
+  // Avoid logging secrets - enhanced with structured logging
+  const timestamp = new Date().toISOString();
+  const logLevel = args[0]?.level || 'INFO';
+  const message = args.filter(arg => typeof arg !== 'object' || !arg.level).join(' ');
+  
+  const logEntry = {
+    timestamp,
+    level: logLevel,
+    message,
+    service: 'github-pr-manager',
+    version: process.env.npm_package_version || '1.0.0'
+  };
+  
+  console.log(JSON.stringify(logEntry));
+}
+
+// Enhanced logging for health monitoring
+function logWithHealth(message, level = 'INFO', metadata = {}) {
+  safeLog({ level }, message);
+  
+  // Record in health monitor
+  if (level === 'ERROR') {
+    healthMonitor.recordError('APPLICATION_ERROR', message, metadata);
+  }
 }
 
 if (!TOKEN) {
@@ -127,14 +193,69 @@ app.use(express.json({
 }));
 
 app.get("/health", (req, res) => {
-  res.json({
-    status: "healthy",
+  const healthStatus = healthMonitor.getHealthStatus();
+  const aiStatus = aiCircuitBreaker.getStatus();
+  const githubStatus = githubCircuitBreaker.getStatus();
+  
+  const response = {
+    status: healthStatus.status,
     timestamp: new Date().toISOString(),
+    uptime: healthStatus.uptimeHuman,
     repo: REPO || null,
     mode: process.env.NODE_ENV || "development",
     ai_enabled: ENABLE_AI_ANALYSIS,
-    ai_service: AI_SERVICE_URL
-  });
+    ai_service: AI_SERVICE_URL,
+    circuit_breakers: {
+      ai: {
+        state: aiStatus.state,
+        failureCount: aiStatus.failureCount,
+        canExecute: aiStatus.canExecute
+      },
+      github: {
+        state: githubStatus.state,
+        failureCount: githubStatus.failureCount,
+        canExecute: githubStatus.canExecute
+      }
+    },
+    metrics: {
+      activeConnections: healthStatus.metrics.application.activeConnections,
+      queueLength: healthStatus.metrics.application.queueLength,
+      totalRequests: healthStatus.metrics.application.totalRequests,
+      errorRate: healthStatus.recentErrorRate
+    },
+    alerts: healthStatus.activeAlerts.length
+  };
+
+  const statusCode = healthStatus.status === 'HEALTHY' ? 200 : 
+                    healthStatus.status === 'DEGRADED' ? 200 : 503;
+  
+  res.status(statusCode).json(response);
+});
+
+// Kubernetes-style readiness probe
+app.get("/ready", (req, res) => {
+  const aiReady = aiCircuitBreaker.getStatus().state !== 'OPEN';
+  const githubReady = githubCircuitBreaker.getStatus().state !== 'OPEN';
+  
+  if (aiReady && githubReady) {
+    res.status(200).json({
+      status: "ready",
+      timestamp: new Date().toISOString(),
+      services: {
+        ai: aiReady,
+        github: githubReady
+      }
+    });
+  } else {
+    res.status(503).json({
+      status: "not ready",
+      timestamp: new Date().toISOString(),
+      services: {
+        ai: aiReady,
+        github: githubReady
+      }
+    });
+  }
 });
 
 // Prometheus metrics endpoint
@@ -186,77 +307,117 @@ app.post("/webhook", async (req, res) => {
   const startTime = Date.now();
   const event = req.headers["x-github-event"];
   const action = req.body?.action || 'unknown';
+  const deliveryId = req.headers["x-github-delivery"] || 'unknown';
   
-  // Track active connections
+  // Track active connections and update health monitor
   activeConnectionsGauge.inc();
+  healthMonitor.updateActiveConnections(activeConnectionsGauge.get().values[0]?.value || 0);
   
   try {
+    logWithHealth(`🌐 Webhook received [${deliveryId}]: ${event}/${action}`, 'INFO', {
+      event, action, deliveryId
+    });
+
     if (WEBHOOK_SECRET && !verifySignature(req)) {
-      safeLog("Webhook signature verification failed");
+      logWithHealth("❌ Webhook signature verification failed", 'ERROR', {
+        event, action, deliveryId
+      });
       recordWebhookProcessing(event || 'unknown', action, (Date.now() - startTime) / 1000, 'auth_failed');
       recordError('webhook_auth_failed', 'signature_verification');
+      healthMonitor.recordRequest(false, Date.now() - startTime);
       return res.status(401).send("Invalid signature");
     }
 
-    safeLog("Received webhook:", event);
-
-    // Process webhook asynchronously
-    processWebhookAsync(event, req.body).catch(err => {
+    // Process webhook asynchronously with enhanced error handling
+    processWebhookWithResilience(event, req.body, deliveryId).catch(err => {
       const duration = (Date.now() - startTime) / 1000;
       recordWebhookProcessing(event || 'unknown', action, duration, 'error');
       recordError('webhook_processing', 'async_handler');
-      safeLog("Webhook processing error:", err.message || err);
+      logWithHealth(`💥 Webhook processing error [${deliveryId}]: ${err.message}`, 'ERROR', {
+        event, action, deliveryId, stack: err.stack
+      });
+      healthMonitor.recordRequest(false, duration * 1000);
     });
 
     const duration = (Date.now() - startTime) / 1000;
     recordWebhookProcessing(event || 'unknown', action, duration, 'accepted');
+    healthMonitor.recordRequest(true, duration * 1000);
+    
+    logWithHealth(`✅ Webhook accepted [${deliveryId}]: ${duration.toFixed(3)}s`, 'INFO', {
+      event, action, deliveryId, duration
+    });
     
     return res.status(202).send("Accepted");
     
   } finally {
     activeConnectionsGauge.dec();
+    healthMonitor.updateActiveConnections(activeConnectionsGauge.get().values[0]?.value || 0);
   }
-});async function processWebhookAsync(event, payload) {
+});
+
+// Enhanced webhook processing with circuit breakers and retry logic
+async function processWebhookWithResilience(event, payload, deliveryId) {
   try {
+    logWithHealth(`🔄 Processing webhook [${deliveryId}]: ${event}`, 'INFO', {
+      event, deliveryId
+    });
+
     if (event === "pull_request") {
       const pr = payload.pull_request;
       const action = payload.action;
       
-      safeLog(`Processing PR webhook: #${pr?.number} action=${action}`);
+      logWithHealth(`📝 Processing PR webhook [${deliveryId}]: #${pr?.number} action=${action}`, 'INFO', {
+        prNumber: pr?.number, action, deliveryId
+      });
       
       if (action === "opened" || action === "reopened" || action === "synchronize") {
-        await analyzePRWithAI(pr, payload.repository);
+        await analyzePRWithResilience(pr, payload.repository, deliveryId);
       }
     } else if (event === "issues") {
       const issue = payload.issue;
       const action = payload.action;
       
       if (action === "opened" || action === "reopened") {
-        await analyzeIssueWithAI(issue, payload.repository);
+        await analyzeIssueWithResilience(issue, payload.repository, deliveryId);
       }
     }
+
+    logWithHealth(`✅ Webhook processing completed [${deliveryId}]`, 'INFO', {
+      event, deliveryId
+    });
+    
   } catch (error) {
-    safeLog("Error processing webhook:", error.message);
+    logWithHealth(`💥 Webhook processing failed [${deliveryId}]: ${error.message}`, 'ERROR', {
+      event, deliveryId, error: error.message, stack: error.stack
+    });
+    throw error;
   }
 }
 
-async function analyzePRWithAI(pr, repository) {
+// Enhanced PR analysis with circuit breakers and retry logic
+async function analyzePRWithResilience(pr, repository, deliveryId) {
   const startTime = Date.now();
   
   if (!ENABLE_AI_ANALYSIS) {
-    safeLog(`AI analysis disabled for PR #${pr.number}`);
+    logWithHealth(`🚫 AI analysis disabled for PR #${pr.number} [${deliveryId}]`, 'INFO');
     recordAIAnalysis('pr', (Date.now() - startTime) / 1000, 'disabled');
     return;
   }
 
   try {
-    safeLog(`Starting AI analysis for PR #${pr.number}`);
+    logWithHealth(`🔍 Starting AI analysis for PR #${pr.number} [${deliveryId}]`, 'INFO', {
+      prNumber: pr.number, deliveryId
+    });
 
-    // Get file changes
-    const files = await octokit.rest.pulls.listFiles({
-      owner: repository.owner.login,
-      repo: repository.name,
-      pull_number: pr.number
+    // Get file changes with GitHub API circuit breaker and retry
+    const files = await githubCircuitBreaker.execute(async () => {
+      return await retryableGitHubCall(async () => {
+        return await octokit.rest.pulls.listFiles({
+          owner: repository.owner.login,
+          repo: repository.name,
+          pull_number: pr.number
+        });
+      });
     });
 
     const prData = {
@@ -264,18 +425,116 @@ async function analyzePRWithAI(pr, repository) {
       files: files.data
     };
 
-    // Get AI analysis
-    const analysis = await aiService.analyzePR(prData);
-    safeLog(`AI analysis completed for PR #${pr.number}:`, {
-      risk: analysis.riskLevel,
-      priority: analysis.priority,
-      recommendation: analysis.recommendation
+    // Perform AI analysis with circuit breaker and retry
+    const analysis = await aiCircuitBreaker.execute(async () => {
+      return await retryableAICall(async () => {
+        const aiStartTime = Date.now();
+        const result = await aiService.analyzePR(prData);
+        const aiDuration = (Date.now() - aiStartTime) / 1000;
+        
+        healthMonitor.recordAIAnalysis(true, aiDuration * 1000);
+        healthMonitor.updateCircuitBreakerStatus(aiCircuitBreaker.state);
+        
+        return result;
+      });
     });
 
-    // Add labels based on AI analysis
+    logWithHealth(`🎯 AI analysis completed for PR #${pr.number} [${deliveryId}]`, 'INFO', {
+      prNumber: pr.number,
+      deliveryId,
+      riskLevel: analysis.riskLevel,
+      priority: analysis.priority,
+      processingTime: (Date.now() - startTime) / 1000
+    });
+
+    // Add labels based on AI analysis with GitHub circuit breaker
     if (TOKEN && analysis.riskLevel !== 'low') {
-      await addLabelsToePR(repository, pr.number, analysis);
+      await githubCircuitBreaker.execute(async () => {
+        await retryableGitHubCall(async () => {
+          await addLabelsToePR(repository, pr.number, analysis);
+        });
+      });
     }
+
+    const duration = (Date.now() - startTime) / 1000;
+    recordAIAnalysis('pr', duration, 'success');
+    
+  } catch (error) {
+    const duration = (Date.now() - startTime) / 1000;
+    
+    if (error.code === 'CIRCUIT_BREAKER_OPEN') {
+      logWithHealth(`⚡ Circuit breaker open for PR #${pr.number} [${deliveryId}] - ${error.message}`, 'WARN', {
+        prNumber: pr.number, deliveryId, circuitBreaker: error.state
+      });
+      recordAIAnalysis('pr', duration, 'circuit_breaker_open');
+    } else {
+      logWithHealth(`❌ AI analysis failed for PR #${pr.number} [${deliveryId}]: ${error.message}`, 'ERROR', {
+        prNumber: pr.number, deliveryId, error: error.message
+      });
+      recordAIAnalysis('pr', duration, 'error');
+      healthMonitor.recordAIAnalysis(false, duration * 1000);
+    }
+    
+    // Update circuit breaker status in health monitor
+    healthMonitor.updateCircuitBreakerStatus(aiCircuitBreaker.state);
+    
+    throw error;
+  }
+}
+
+// Enhanced issue analysis with resilience
+async function analyzeIssueWithResilience(issue, repository, deliveryId) {
+  const startTime = Date.now();
+  
+  if (!ENABLE_AI_ANALYSIS) {
+    logWithHealth(`🚫 AI analysis disabled for issue #${issue.number} [${deliveryId}]`, 'INFO');
+    return;
+  }
+
+  try {
+    logWithHealth(`🔍 Starting AI analysis for issue #${issue.number} [${deliveryId}]`, 'INFO', {
+      issueNumber: issue.number, deliveryId
+    });
+
+    // Perform AI analysis with circuit breaker and retry
+    const analysis = await aiCircuitBreaker.execute(async () => {
+      return await retryableAICall(async () => {
+        const aiStartTime = Date.now();
+        const result = await aiService.analyzeIssue(issue);
+        const aiDuration = (Date.now() - aiStartTime) / 1000;
+        
+        healthMonitor.recordAIAnalysis(true, aiDuration * 1000);
+        
+        return result;
+      });
+    });
+
+    logWithHealth(`🎯 AI analysis completed for issue #${issue.number} [${deliveryId}]`, 'INFO', {
+      issueNumber: issue.number,
+      deliveryId,
+      priority: analysis.priority,
+      category: analysis.category,
+      processingTime: (Date.now() - startTime) / 1000
+    });
+
+    const duration = (Date.now() - startTime) / 1000;
+    recordAIAnalysis('issue', duration, 'success');
+    
+  } catch (error) {
+    const duration = (Date.now() - startTime) / 1000;
+    
+    if (error.code === 'CIRCUIT_BREAKER_OPEN') {
+      logWithHealth(`⚡ Circuit breaker open for issue #${issue.number} [${deliveryId}]`, 'WARN');
+      recordAIAnalysis('issue', duration, 'circuit_breaker_open');
+    } else {
+      logWithHealth(`❌ AI analysis failed for issue #${issue.number} [${deliveryId}]: ${error.message}`, 'ERROR');
+      recordAIAnalysis('issue', duration, 'error');
+      healthMonitor.recordAIAnalysis(false, duration * 1000);
+    }
+    
+    throw error;
+  }
+}
 
     // Generate and post review comment if high risk
     if (TOKEN && (analysis.riskLevel === 'high' || analysis.riskLevel === 'critical')) {
