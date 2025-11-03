@@ -8,6 +8,16 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 
 ## 📚 Documentation Index
 
+### 📋 Project Foundation
+
+**[PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md)** — *Project goals and requirements*
+- Business objectives and success criteria
+- Key features for launch (MVP, Phase 2, Phase 3)
+- Technical constraints and must-have integrations
+- User personas and target audience
+- Roadmap summary and risk mitigation
+- Essential reading for understanding project scope
+
 ### 🎯 Core Philosophy & Strategy
 
 **[AGENT_FIRST_PHILOSOPHY.md](./AGENT_FIRST_PHILOSOPHY.md)** — *Start here for strategic context*
@@ -54,20 +64,6 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 - Production deployment
 - Troubleshooting guide
 
-**[TECHNICAL_CONSTRAINTS.md](./TECHNICAL_CONSTRAINTS.md)** — *Platform requirements & integrations*
-- Framework and runtime requirements (Next.js, TypeScript, Node.js)
-- Netlify deployment constraints and patterns
-- AI provider integrations (OpenAI, GitHub Models, Sora)
-- Database requirements (Supabase PostgreSQL)
-- Platform API integrations (Instagram, YouTube, TikTok)
-- Security constraints (JWT, webhooks, CodeQL)
-- CI/CD pipeline requirements
-- Testing requirements (Vitest, Playwright)
-- Performance targets and monitoring
-- Accessibility compliance (WCAG 2.1 AA)
-- Environment variables summary
-- Cost constraints and optimization
-
 ### 📊 User Guides
 
 **[CREATOR_DASHBOARD.md](./CREATOR_DASHBOARD.md)** — *How to use Creator Studio*
@@ -96,32 +92,39 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 
 ## 🗺️ Navigation by Role
 
+### For Product/Business Leaders
+1. Start: [PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md)
+2. User Research: [PROJECT_REQUIREMENTS.md - Section 4](../PROJECT_REQUIREMENTS.md#4-user-personas-and-target-audience)
+3. Roadmap: [PROJECT_REQUIREMENTS.md - Section 8](../PROJECT_REQUIREMENTS.md#8-roadmap-summary)
+
 ### For Creators/Users
 1. Start: [CREATOR_DASHBOARD.md](./CREATOR_DASHBOARD.md)
 2. Setup: [PROVIDER_INTEGRATION.md](./PROVIDER_INTEGRATION.md)
 3. Reference: [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md)
 
 ### For Engineers/Developers
-1. Start: [AGENT_FIRST_PHILOSOPHY.md](./AGENT_FIRST_PHILOSOPHY.md)
-2. Core: [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md)
-3. Constraints: [TECHNICAL_CONSTRAINTS.md](./TECHNICAL_CONSTRAINTS.md)
+1. Start: [PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md) (understand scope)
+2. Philosophy: [AGENT_FIRST_PHILOSOPHY.md](./AGENT_FIRST_PHILOSOPHY.md)
+3. Core: [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md)
 4. Implementation: [AGENT_ORCHESTRATION.md](./AGENT_ORCHESTRATION.md)
 5. Database: [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)
 6. Quickstart: [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md)
 
 ### For DevOps/Infrastructure
-1. Start: [TECHNICAL_CONSTRAINTS.md](./TECHNICAL_CONSTRAINTS.md)
-2. Database: [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)
-3. Deployment: [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md) (Step 7)
-4. Monitoring: [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md) (Metrics Ritual)
+1. Start: [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)
+2. Deployment: [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md) (Step 7)
+3. Monitoring: [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md) (Metrics Ritual)
 
 ---
 
 ## 🚀 Quick Links
 
 ### Most Requested
+- **What is this project about?** → [PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md)
+- **What are the business goals?** → [PROJECT_REQUIREMENTS.md - Section 1](../PROJECT_REQUIREMENTS.md#1-business-objectives)
+- **What features are planned?** → [PROJECT_REQUIREMENTS.md - Section 2](../PROJECT_REQUIREMENTS.md#2-key-features-for-launch)
+- **Who is this for?** → [PROJECT_REQUIREMENTS.md - Section 4](../PROJECT_REQUIREMENTS.md#4-user-personas-and-target-audience)
 - **How do I get started?** → [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md)
-- **What are the technical requirements?** → [TECHNICAL_CONSTRAINTS.md](./TECHNICAL_CONSTRAINTS.md)
 - **What is the Agent-First Philosophy?** → [AGENT_FIRST_PHILOSOPHY.md](./AGENT_FIRST_PHILOSOPHY.md)
 - **How do BeeHive Rituals work?** → [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md)
 - **How do I create agent teams?** → [AGENT_ORCHESTRATION.md](./AGENT_ORCHESTRATION.md)
@@ -170,6 +173,13 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 
 ## 🎯 Learning Paths
 
+### Path 0: Product Overview (30 minutes)
+1. [PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md) - Executive Summary (5 min)
+2. [PROJECT_REQUIREMENTS.md - Business Objectives](../PROJECT_REQUIREMENTS.md#1-business-objectives) (10 min)
+3. [PROJECT_REQUIREMENTS.md - User Personas](../PROJECT_REQUIREMENTS.md#4-user-personas-and-target-audience) (15 min)
+
+**Outcome**: Understand the product vision, goals, and target users
+
 ### Path 1: Creator (1 hour)
 1. [CREATOR_DASHBOARD.md](./CREATOR_DASHBOARD.md) (15 min)
 2. [PROVIDER_INTEGRATION.md](./PROVIDER_INTEGRATION.md) (15 min)
@@ -179,15 +189,14 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 
 ### Path 2: Developer (3 hours)
 1. [AGENT_FIRST_PHILOSOPHY.md](./AGENT_FIRST_PHILOSOPHY.md) (30 min)
-2. [TECHNICAL_CONSTRAINTS.md](./TECHNICAL_CONSTRAINTS.md) (30 min)
-3. [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md) (60 min)
-4. [AGENT_ORCHESTRATION.md](./AGENT_ORCHESTRATION.md) (60 min)
-5. [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md) (30 min)
+2. [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md) (60 min)
+3. [AGENT_ORCHESTRATION.md](./AGENT_ORCHESTRATION.md) (60 min)
+4. [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md) (30 min)
 
 **Outcome**: Can build and deploy agent teams
 
 ### Path 3: Architect (4 hours)
-1. All of Path 2 (3.5 hours)
+1. All of Path 2 (3 hours)
 2. [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) (60 min)
 3. [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md) Step 7 (30 min)
 
@@ -285,6 +294,7 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 
 | Document | Status | Last Updated | Pages |
 |----------|--------|--------------|-------|
+| [PROJECT_REQUIREMENTS.md](../PROJECT_REQUIREMENTS.md) | ✅ Complete | 2025-11-02 | 35 |
 | [AGENT_FIRST_PHILOSOPHY.md](./AGENT_FIRST_PHILOSOPHY.md) | ✅ Complete | 2025-01-31 | 25 |
 | [BEEHIVE_RITUALS.md](./BEEHIVE_RITUALS.md) | ✅ Complete | 2025-01-31 | 28 |
 | [AGENT_ORCHESTRATION.md](./AGENT_ORCHESTRATION.md) | ✅ Complete | 2025-01-31 | 22 |
@@ -292,9 +302,8 @@ This documentation maps David Ondrej's proven Agent-First methodologies to the B
 | [CREATOR_DASHBOARD.md](./CREATOR_DASHBOARD.md) | ✅ Complete | 2025-01-31 | 20 |
 | [PROVIDER_INTEGRATION.md](./PROVIDER_INTEGRATION.md) | ✅ Complete | 2025-01-31 | 15 |
 | [INTEGRATION_QUICKSTART.md](./INTEGRATION_QUICKSTART.md) | ✅ Complete | 2025-01-31 | 18 |
-| [TECHNICAL_CONSTRAINTS.md](./TECHNICAL_CONSTRAINTS.md) | ✅ Complete | 2025-11-02 | 35 |
 
-**Total Documentation**: 8 comprehensive guides, 181 pages, 75,000+ words
+**Total Documentation**: 8 comprehensive guides, 181 pages, 65,000+ words
 
 ---
 

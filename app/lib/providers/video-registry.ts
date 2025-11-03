@@ -360,12 +360,3 @@ export function createVideoRegistry(customConfig?: Partial<VideoRegistryConfig>)
 
   return new VideoProviderRegistry(finalConfig);
 }
-
-// Export types for external use
-export type {
-  VideoProvider,
-  UnifiedVideoRequest,
-  UnifiedVideoResponse,
-  VideoProviderConfig,
-  VideoRegistryConfig,
-};

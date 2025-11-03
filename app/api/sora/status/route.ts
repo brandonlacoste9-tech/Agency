@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { soraClient } from "@/lib/sora/sora-client";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * GET /api/sora/status?jobId=...

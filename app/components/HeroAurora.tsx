@@ -1,4 +1,6 @@
-export default function HeroAurora() {
+import { memo } from "react";
+
+const HeroAurora = memo(function HeroAurora() {
   return (
     <section className="relative overflow-hidden bg-white">
       {/* Aurora backdrop */}
@@ -69,4 +71,6 @@ export default function HeroAurora() {
       </div>
     </section>
   );
-}
+});
+
+export default HeroAurora;

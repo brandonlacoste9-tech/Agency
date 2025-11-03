@@ -108,10 +108,73 @@ netlify dev          # Run Netlify functions locally (test webhooks)
 - **No any types**: Use proper typing or unknown/object
 - **ESLint compliance**: Run `npm run typecheck` before committing
 
+## AI Video Generation Integration (LongCat)
+
+### LongCat Client Architecture
+- **Location**: `lib/providers/longcat-client.ts`
+- **Purpose**: Generate videos from text prompts using LongCat API with retry/polling support
+- **Key Features**:
+  - Retry logic with exponential backoff (default: 3 attempts)
+  - Polling with timeout (default: 5 minutes max wait)
+  - Support for cinematic styles, custom durations, aspect ratios
+  - Response transformation (snake_case API → camelCase internal)
+- **Config**:
+  ```typescript
+  export interface LongCatConfig {
+    apiKey: string;
+    baseUrl?: string;      // Default: https://api.longcat.ai/v1
+    timeout?: number;      // Default: 300000ms (5 minutes)
+    retryAttempts?: number; // Default: 3
+  }
+  ```
+
+### Video Provider Registry
+- **Location**: `lib/providers/video-registry.ts`
+- **Purpose**: Unified abstraction for multiple AI video providers (LongCat, Sora, Runway, Pika)
+- **Key Pattern**: Convert unified requests to provider-specific formats
+- **Cost Optimization**: Providers ranked by priority and cost-per-second
+- **Fallback Support**: Chain multiple providers for reliability
+
+### Testing LongCat Integration
+- **Test File**: `app/lib/providers/__tests__/longcat-client.test.ts`
+- **Coverage**: 13+ test cases including retry logic, polling, error handling
+- **Mock Pattern**: Global fetch with explicit Object.defineProperty for mock response objects
+- **Key Test Patterns**:
+  ```typescript
+  // Mock fetch response
+  (fetch as any).mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(mockData),
+  });
+  
+  // Mock retry logic - use mockImplementationOnce (not mockResolvedValueOnce)
+  // as it can be called multiple times
+  (fetch as any).mockImplementationOnce(() => 
+    Promise.resolve({ ok: true, json: async () => mockData })
+  );
+  ```
+
+### Common Development Tasks - LongCat
+1. **Add video generation endpoint**:
+   - Create API route in `app/api/video/generate/route.ts`
+   - Call `client.generateVideo(request)` from `lib/providers/`
+   - Return jobId for async processing
+   
+2. **Status polling**:
+   - Use `client.getVideoStatus(videoId)` for single-shot polling
+   - Use `client.waitForCompletion(videoId)` for blocking wait with timeout
+   
+3. **Debug video generation issues**:
+   - Check `LONGCAT_API_KEY` environment variable
+   - Verify request parameters match API contract (prompt, duration, aspect_ratio, style)
+   - Use detailed error messages from client (includes status code + API response)
+
 ## Critical Integration Points
 - **Instagram**: Uses Facebook Graph API v17.0 (two-step: create → publish)
 - **AI Agents**: External BEE API with streaming response handling
+- **Video Generation**: LongCat API with retry/polling, Video Provider Registry for multi-provider support
 - **Supabase**: Database integration for user data and analytics
 - **Netlify**: Static hosting with serverless functions for backend logic
 
-Last updated: 2025-11-02
+Last updated: 2025-11-08
