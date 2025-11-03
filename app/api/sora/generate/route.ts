@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { soraClient, SoraGenerationRequest } from "@/lib/sora/sora-client";
 import { telemetry, generateRequestId } from "@/lib/telemetry";
-import { selectVideoProvider } from "@/lib/providers/provider-selector";
+import { selectVideoProvider, providerSelector } from "@/lib/providers/provider-selector";
 
 export const runtime = "nodejs";
 
@@ -53,8 +53,15 @@ export async function POST(req: NextRequest) {
 
     const videoDuration = duration || 10;
 
-    // Use ProviderSelector to choose optimal provider
-    const providerSelection = selectVideoProvider(videoDuration, mode, priority);
+    // Use ProviderSelector to choose optimal provider (with caching support)
+    const providerSelection = await selectVideoProvider(
+      prompt.trim(),
+      videoDuration,
+      mode,
+      priority,
+      userTier,
+      userId
+    );
     
     // Track provider selection for telemetry
     telemetry.trackVideoRequest({
@@ -76,8 +83,43 @@ export async function POST(req: NextRequest) {
       aspectRatio: aspectRatio as any,
     };
 
+    // Check if we have a cache hit first
+    if (providerSelection.cacheStatus === 'hit') {
+      // Return cached result immediately
+      return Response.json({
+        jobId: 'cached_' + Date.now(),
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        requestId,
+        provider: providerSelection.provider,
+        estimatedCost: providerSelection.estimatedCost,
+        estimatedLatency: providerSelection.estimatedLatency,
+        selectionReason: providerSelection.reason,
+        fallbackProviders: providerSelection.fallbacks,
+        cacheStatus: 'hit',
+        message: `Cached result available from ${providerSelection.provider}`,
+      });
+    }
+
     // Submit to Sora (or selected provider)
     const job = await soraClient.generateVideo(request);
+
+    // Cache the result for future requests
+    if (job.status === 'completed' || job.status === 'queued') {
+      await providerSelector.cacheResult(
+        {
+          contentType: 'video',
+          mode,
+          duration: videoDuration,
+          priority,
+          userTier,
+          userId,
+          prompt: prompt.trim()
+        },
+        job,
+        providerSelection.provider
+      );
+    }
 
     // Track success
     telemetry.trackVideoResult({

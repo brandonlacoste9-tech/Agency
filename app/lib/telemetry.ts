@@ -1,6 +1,7 @@
 /**
  * Simple telemetry utility for tracking video generation events
  * Fire-and-forget approach to avoid blocking request processing
+ * Includes cache performance tracking for optimization insights
  */
 
 export interface TelemetryEvent {
@@ -25,6 +26,33 @@ export interface VideoGenerationResultEvent {
   status: string;
   latency_ms: number;
   error?: string;
+}
+
+export interface CachePerformanceEvent {
+  requestId: string;
+  cacheKey: string;
+  contentType: 'video' | 'image' | 'text' | '3d' | 'metadata';
+  operation: 'hit' | 'miss' | 'set' | 'delete' | 'cleanup' | 'invalidate';
+  latency_ms: number;
+  sizeBytes?: number;
+  ttl?: number;
+  provider?: string;
+  userTier?: 'free' | 'pro' | 'enterprise';
+  mode?: 'preview' | 'production';
+  error?: string;
+}
+
+export interface CacheStatsEvent {
+  totalEntries: number;
+  totalSizeBytes: number;
+  hitRate: number;
+  totalHits: number;
+  totalMisses: number;
+  totalEvictions: number;
+  entriesByType: Record<string, number>;
+  averageAgeSeconds: number;
+  healthStatus: 'healthy' | 'degraded' | 'unhealthy';
+  reportedAt: number;
 }
 
 class TelemetryClient {
@@ -65,6 +93,81 @@ class TelemetryClient {
    */
   trackVideoResult(data: VideoGenerationResultEvent): void {
     this.track('video_generation_result', data);
+  }
+
+  /**
+   * Track cache performance event
+   */
+  trackCachePerformance(data: CachePerformanceEvent): void {
+    this.track('cache_performance', data);
+  }
+
+  /**
+   * Track cache statistics snapshot
+   */
+  trackCacheStats(data: CacheStatsEvent): void {
+    this.track('cache_stats', data);
+  }
+
+  /**
+   * Track cache hit with timing
+   */
+  trackCacheHit(requestId: string, cacheKey: string, contentType: string, latency: number, options: {
+    provider?: string;
+    userTier?: 'free' | 'pro' | 'enterprise';
+    mode?: 'preview' | 'production';
+    sizeBytes?: number;
+  } = {}): void {
+    this.trackCachePerformance({
+      requestId,
+      cacheKey,
+      contentType: contentType as any,
+      operation: 'hit',
+      latency_ms: latency,
+      ...options
+    });
+  }
+
+  /**
+   * Track cache miss with provider fallback info
+   */
+  trackCacheMiss(requestId: string, cacheKey: string, contentType: string, latency: number, options: {
+    provider?: string;
+    userTier?: 'free' | 'pro' | 'enterprise';
+    mode?: 'preview' | 'production';
+    reason?: string;
+  } = {}): void {
+    this.trackCachePerformance({
+      requestId,
+      cacheKey,
+      contentType: contentType as any,
+      operation: 'miss',
+      latency_ms: latency,
+      error: options.reason,
+      provider: options.provider,
+      userTier: options.userTier,
+      mode: options.mode
+    });
+  }
+
+  /**
+   * Track cache storage operations
+   */
+  trackCacheSet(requestId: string, cacheKey: string, contentType: string, latency: number, options: {
+    sizeBytes?: number;
+    ttl?: number;
+    provider?: string;
+    userTier?: 'free' | 'pro' | 'enterprise';
+    mode?: 'preview' | 'production';
+  } = {}): void {
+    this.trackCachePerformance({
+      requestId,
+      cacheKey,
+      contentType: contentType as any,
+      operation: 'set',
+      latency_ms: latency,
+      ...options
+    });
   }
 
   /**

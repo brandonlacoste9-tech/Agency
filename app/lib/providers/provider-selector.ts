@@ -6,7 +6,12 @@
  * - Budget constraints 
  * - Content type and duration
  * - Provider availability and cost
+ * - Cache availability (checks cache before provider calls)
  */
+
+import { CacheGenerationParams, CacheAdapter } from '../cache/cache-adapter';
+import { cacheAdapter } from '../cache/netlify-cache-adapter';
+import { calculateDynamicTtl, getCacheStrategy, CACHE_CONFIG } from '../cache/cache-config';
 
 export interface ProviderConfig {
   name: string;
@@ -26,6 +31,8 @@ export interface SelectionCriteria {
   budget?: number; // Max cost in USD
   priority: 'speed' | 'quality' | 'cost';
   userTier?: 'free' | 'pro' | 'enterprise';
+  userId?: string; // For cache key generation
+  prompt?: string; // For cache key generation
 }
 
 export interface ProviderSelection {
@@ -35,13 +42,17 @@ export interface ProviderSelection {
   estimatedLatency: number; // seconds
   reason: string;
   fallbacks: string[]; // Ordered list of fallback providers
+  cacheStatus: 'hit' | 'miss' | 'disabled';
+  cacheKey?: string; // For cache hits
 }
 
 export class ProviderSelector {
   private providers: Map<string, ProviderConfig> = new Map();
   private circuitBreaker: Map<string, { failures: number; lastFailure: number }> = new Map();
+  private cache: CacheAdapter;
 
-  constructor() {
+  constructor(cacheAdapterInstance?: CacheAdapter) {
+    this.cache = cacheAdapterInstance || cacheAdapter; // Use provided instance or default
     this.initializeProviders();
   }
 
@@ -98,8 +109,16 @@ export class ProviderSelector {
 
   /**
    * Select the optimal provider for a request
+   * Checks cache first, then selects provider if cache miss
    */
-  selectProvider(criteria: SelectionCriteria): ProviderSelection {
+  async selectProvider(criteria: SelectionCriteria): Promise<ProviderSelection> {
+    // Check cache first if enabled
+    const cacheResult = await this.checkCache(criteria);
+    if (cacheResult) {
+      return cacheResult;
+    }
+
+    // Cache miss or disabled, proceed with provider selection
     const availableProviders = this.getAvailableProviders(criteria.contentType);
     
     if (availableProviders.length === 0) {
@@ -125,8 +144,146 @@ export class ProviderSelector {
       estimatedCost: this.estimateCost(selected.config, criteria),
       estimatedLatency: this.estimateLatency(selected.config, criteria),
       reason: this.explainSelection(selected.config, criteria),
-      fallbacks
+      fallbacks,
+      cacheStatus: 'miss',
+      cacheKey: this.generateCacheKey(criteria)
     };
+  }
+
+  /**
+   * Check cache for existing content matching the criteria
+   */
+  private async checkCache(criteria: SelectionCriteria): Promise<ProviderSelection | null> {
+    if (!CACHE_CONFIG.enabled) {
+      return null;
+    }
+
+    try {
+      const cacheKey = this.generateCacheKey(criteria);
+      const cached = await this.cache.get(cacheKey);
+
+      if (cached && !cached.value.expired) {
+        // Cache hit - return cached provider info
+        return {
+          provider: cached.provider,
+          confidence: 1.0, // Maximum confidence for cache hits
+          estimatedCost: 0, // No cost for cached content
+          estimatedLatency: 0.5, // Minimal latency for cache retrieval
+          reason: 'Cached result available',
+          fallbacks: [],
+          cacheStatus: 'hit',
+          cacheKey
+        };
+      }
+    } catch (error) {
+      console.warn('Cache check failed:', error);
+      // Continue with provider selection on cache errors
+    }
+
+    return null;
+  }
+
+  /**
+   * Generate cache key from selection criteria
+   */
+  private generateCacheKey(criteria: SelectionCriteria): string {
+    const cacheParams: CacheGenerationParams = {
+      prompt: criteria.prompt || '',
+      contentType: criteria.contentType,
+      parameters: {
+        duration: criteria.duration,
+        mode: criteria.mode,
+        priority: criteria.priority,
+        budget: criteria.budget
+      },
+      userContext: {
+        tier: criteria.userTier,
+        userId: criteria.userId
+      }
+    };
+
+    return this.cache.generateKey(cacheParams);
+  }
+
+  /**
+   * Store generation result in cache
+   */
+  async cacheResult(
+    criteria: SelectionCriteria,
+    result: any,
+    provider: string
+  ): Promise<void> {
+    if (!CACHE_CONFIG.enabled) {
+      return;
+    }
+
+    try {
+      const cacheKey = this.generateCacheKey(criteria);
+      const strategy = getCacheStrategy(
+        criteria.userTier || 'free',
+        criteria.contentType,
+        criteria.mode || 'production'
+      );
+
+      if (!strategy.enabled) {
+        return;
+      }
+
+      const ttl = calculateDynamicTtl(CACHE_CONFIG, criteria.contentType, {
+        duration: criteria.duration,
+        complexity: this.inferComplexity(criteria),
+        userTier: criteria.userTier,
+        mode: criteria.mode,
+        estimatedCost: this.estimateCostForCriteria(criteria)
+      });
+
+      await this.cache.set(cacheKey, result, {
+        ttl,
+        contentType: criteria.contentType,
+        provider,
+        metadata: {
+          mode: criteria.mode,
+          priority: criteria.priority,
+          userTier: criteria.userTier,
+          duration: criteria.duration,
+          createdBy: 'provider-selector'
+        }
+      });
+
+    } catch (error) {
+      console.warn('Failed to cache result:', error);
+      // Don't throw - caching failures shouldn't break generation
+    }
+  }
+
+  /**
+   * Infer content complexity from criteria
+   */
+  private inferComplexity(criteria: SelectionCriteria): 'simple' | 'medium' | 'complex' {
+    if (criteria.contentType === '3d') return 'complex';
+    
+    if (criteria.contentType === 'video') {
+      if (criteria.duration && criteria.duration > 30) return 'complex';
+      if (criteria.duration && criteria.duration > 10) return 'medium';
+      return 'simple';
+    }
+
+    if (criteria.mode === 'production' && criteria.priority === 'quality') {
+      return 'complex';
+    }
+
+    return 'medium';
+  }
+
+  /**
+   * Estimate cost for criteria (used for cache TTL calculation)
+   */
+  private estimateCostForCriteria(criteria: SelectionCriteria): number {
+    const availableProviders = this.getAvailableProviders(criteria.contentType);
+    if (availableProviders.length === 0) return 0.05; // Default
+
+    const provider = availableProviders[0]; // Use first available for estimation
+    return this.estimateCost(provider, criteria);
   }
 
   private getAvailableProviders(contentType: string): ProviderConfig[] {
@@ -286,14 +443,14 @@ export class ProviderSelector {
   getProviderHealth(): Record<string, { healthy: boolean; failures: number; lastFailure?: number }> {
     const health: Record<string, any> = {};
     
-    for (const [name] of this.providers) {
+    Array.from(this.providers.keys()).forEach(name => {
       const circuitState = this.circuitBreaker.get(name);
       health[name] = {
         healthy: this.isProviderHealthy(name),
         failures: circuitState?.failures || 0,
         lastFailure: circuitState?.lastFailure
       };
-    }
+    });
 
     return health;
   }
@@ -303,31 +460,43 @@ export class ProviderSelector {
 export const providerSelector = new ProviderSelector();
 
 /**
- * Convenience function for video provider selection
+ * Convenience function for video provider selection with caching
  */
-export function selectVideoProvider(
+export async function selectVideoProvider(
+  prompt: string,
   duration: number,
   mode: 'preview' | 'production' = 'production',
-  priority: 'speed' | 'quality' | 'cost' = 'quality'
-): ProviderSelection {
-  return providerSelector.selectProvider({
+  priority: 'speed' | 'quality' | 'cost' = 'quality',
+  userTier?: 'free' | 'pro' | 'enterprise',
+  userId?: string
+): Promise<ProviderSelection> {
+  return await providerSelector.selectProvider({
     contentType: 'video',
     mode,
     duration,
-    priority
+    priority,
+    userTier,
+    userId,
+    prompt
   });
 }
 
 /**
- * Convenience function for image provider selection
+ * Convenience function for image provider selection with caching
  */
-export function selectImageProvider(
+export async function selectImageProvider(
+  prompt: string,
   mode: 'preview' | 'production' = 'production',
-  priority: 'speed' | 'quality' | 'cost' = 'quality'
-): ProviderSelection {
-  return providerSelector.selectProvider({
+  priority: 'speed' | 'quality' | 'cost' = 'quality',
+  userTier?: 'free' | 'pro' | 'enterprise',
+  userId?: string
+): Promise<ProviderSelection> {
+  return await providerSelector.selectProvider({
     contentType: 'image',
     mode,
-    priority
+    priority,
+    userTier,
+    userId,
+    prompt
   });
 }
