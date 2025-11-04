@@ -1,180 +1,24 @@
-# Copilot Instructions for AdGenXAI - AI Sensory Cortex
+# Copilot Instructions
 
-## Project Overview
-AdGenXAI is a Next.js AI-powered advertising platform with a "Sensory Cortex" architecture. The system generates ads/reels using AI agents, publishes to social platforms via Netlify functions, and provides a polished aurora-themed UI. Think of it as a webhook-driven AI advertising automation platform.
+## Repo Context
+This repo: **AdgenXAI Core**  
+Role in stack: Main AdgenXAI platform and agent coordination  
+Primary runtime: Node 20 / TypeScript + Next.js  
+Deployment: Netlify with agent services
 
-## Architecture ("Sensory Cortex" Pattern)
-- **Frontend**: Next.js 14.2+ app with static export (`output: 'export'`) for Netlify hosting
-- **Backend**: Netlify Functions act as the "sensory cortex" - serverless webhooks that orchestrate AI agents
-- **AI Integration**: External "Bee Agent" API calls for content generation
-- **Platform Publishing**: Modular platform adapters in `lib/platforms/` (Instagram, TikTok, YouTube)
-- **Deployment**: Fully automated via "BEE-SHIP" batch scripts that commit → push → auto-deploy
-- **CI/CD**: GitHub Actions with CodeQL security scanning, auto-labeling, and Copilot code reviews
-- **Tech Stack**:
-  - Next.js 14.2 with App Router
-  - TypeScript (strict mode)
-  - Tailwind CSS for styling
-  - Framer Motion for animations
-  - Vitest + Testing Library for testing
-  - Netlify for hosting & serverless functions
+## Architecture Hints
+- **Module system**: ES6 modules with Next.js App Router
+- **Key folders**: app/ (Next.js), agents/ (AI workers), scripts/ (automation)
+- **Integration points**: GitHub APIs, AI services, webhook processing, dashboard
+- **Agent orchestration with fallback patterns**: {{key architectural decisions}}
 
-## Key Developer Workflows
+## AI Agent Rules
+- Extend existing utilities before adding new ones
+- All network calls must handle errors and timeouts
+- Commit style: `feat:`, `fix:`, `ci:`, `docs:`
+- Never generate or commit secrets, tokens, or API keys
+- Test changes before PR submission
+- - Use existing agent patterns in agents/ directory\n- All external calls need error handling and timeouts\n- Maintain separation between UI (app/) and agents
 
-### Quick Development Start
-```bash
-npm run dev          # Start Next.js dev server
-npm run test:watch   # Run Vitest in watch mode
-npm run typecheck    # TypeScript validation
-npm run build        # Production build
-```
-
-### Local Testing with Netlify Functions
-```bash
-netlify dev          # Run Netlify functions locally (test webhooks)
-# POST to /.netlify/functions/<name> for testing
-```
-
-## Essential Knowledge for AI Agents
-
-### Architecture Patterns
-- **"use client"** directive: Required for components with state, browser APIs, or Framer Motion (see `TopBar.tsx`, `PromptCard.tsx`)
-- **Streaming Pattern**: AbortController with `abortRef` for cancellable AI agent calls (see `PromptCard.tsx` lines 15-20)
-- **Platform Adapter Contract**: All platform integrations follow same signature:
-  ```typescript
-  export type PlatformConfig = { accountId: string; accessToken: string };
-  export async function publishContent(config: PlatformConfig, content: any): Promise<{ publishedId: string }>
-  ```
-
-### Netlify Function Conventions (CRITICAL)
-- **Always include CORS headers** in all functions
-- **Handle OPTIONS method** for preflight requests
-- **Environment variables**: Use `NEXT_PUBLIC_SENSORY_CORTEX_URL` for frontend/function communication
-- **Error handling**: Return structured JSON with `{ error: string, details?: string }`
-- **Example pattern**: See `netlify/functions/post-to-instagram.ts`
-
-### File Structure Navigation
-- `app/` — React pages & components (App Router)
-  - `app/components/` — Reusable UI components
-  - `app/api/` — Server endpoints (complement Netlify functions)
-  - `app/components/__tests__/` — Component tests with accessibility checks
-- `lib/platforms/` — Platform adapters (Instagram, TikTok, YouTube)
-- `netlify/functions/` — Serverless webhook functions
-- `docs/bee-ship/` — BEE-SHIP deployment documentation
-- `scripts/deployment/` — Automated deployment scripts (.bat files)
-
-### Testing Patterns
-- **Unit tests**: Vitest + @testing-library in jsdom environment
-- **Test naming**: `ComponentName.test.tsx` or `ComponentName.feature.test.tsx`
-- **Accessibility**: All components have a11y smoke tests (see `a11y.smoke.test.tsx`)
-- **Streaming tests**: Mock ReadableStream for testing streaming UI components
-- **Coverage**: Run `npm run test:ci` for coverage reports
-
-### Configuration & Environment
-- **Static Export**: `next.config.mjs` has `output: 'export'` for Netlify
-- **Path Aliases**: Use `@/` imports (see `tsconfig.json` and `vitest.config.ts`)
-- **Required env vars**: `BEE_API_URL`, `BEE_API_KEY`, `INSTAGRAM_ACCOUNT_ID`, `FB_ACCESS_TOKEN`, `SUPABASE_*`
-- **Netlify redirects**: API routes redirect from `/api/*` to `/.netlify/functions/*`
-
-### BEE-SHIP Deployment System
-- **One-click deployment**: Use `.bat` scripts in `scripts/deployment/`
-- **Commit → Push → Auto-deploy**: GitHub Actions handle CI/CD pipeline
-- **Documentation**: See `docs/bee-ship/` for complete deployment guides
-- **Local testing**: Use `netlify dev` before shipping
-
-## Common Development Tasks
-
-### Adding a New Platform
-1. Create adapter in `lib/platforms/newplatform.ts` following the contract
-2. Add Netlify function in `netlify/functions/post-to-newplatform.ts`
-3. Add environment variables to `netlify.toml`
-4. Write tests in `__tests__/` directory
-5. Update documentation in `docs/`
-
-### Debugging Webhooks
-- Use `netlify dev` to test functions locally
-- Check browser network tab for CORS issues
-- Verify environment variables are set correctly
-- Test with `curl` or Postman for function endpoints
-
-### Component Development
-- Add `"use client"` for interactive components
-- Include accessibility attributes and ARIA labels
-- Write corresponding test in `__tests__/` directory
-- Use Framer Motion for animations with proper reduced motion support
-
-## TypeScript & Code Quality
-- **Strict mode**: All TypeScript errors must be resolved
-- **Path imports**: Use `@/components`, `@/lib` aliases
-- **No any types**: Use proper typing or unknown/object
-- **ESLint compliance**: Run `npm run typecheck` before committing
-
-## AI Video Generation Integration (LongCat)
-
-### LongCat Client Architecture
-- **Location**: `lib/providers/longcat-client.ts`
-- **Purpose**: Generate videos from text prompts using LongCat API with retry/polling support
-- **Key Features**:
-  - Retry logic with exponential backoff (default: 3 attempts)
-  - Polling with timeout (default: 5 minutes max wait)
-  - Support for cinematic styles, custom durations, aspect ratios
-  - Response transformation (snake_case API → camelCase internal)
-- **Config**:
-  ```typescript
-  export interface LongCatConfig {
-    apiKey: string;
-    baseUrl?: string;      // Default: https://api.longcat.ai/v1
-    timeout?: number;      // Default: 300000ms (5 minutes)
-    retryAttempts?: number; // Default: 3
-  }
-  ```
-
-### Video Provider Registry
-- **Location**: `lib/providers/video-registry.ts`
-- **Purpose**: Unified abstraction for multiple AI video providers (LongCat, Sora, Runway, Pika)
-- **Key Pattern**: Convert unified requests to provider-specific formats
-- **Cost Optimization**: Providers ranked by priority and cost-per-second
-- **Fallback Support**: Chain multiple providers for reliability
-
-### Testing LongCat Integration
-- **Test File**: `app/lib/providers/__tests__/longcat-client.test.ts`
-- **Coverage**: 13+ test cases including retry logic, polling, error handling
-- **Mock Pattern**: Global fetch with explicit Object.defineProperty for mock response objects
-- **Key Test Patterns**:
-  ```typescript
-  // Mock fetch response
-  (fetch as any).mockResolvedValueOnce({
-    ok: true,
-    status: 200,
-    json: () => Promise.resolve(mockData),
-  });
-  
-  // Mock retry logic - use mockImplementationOnce (not mockResolvedValueOnce)
-  // as it can be called multiple times
-  (fetch as any).mockImplementationOnce(() => 
-    Promise.resolve({ ok: true, json: async () => mockData })
-  );
-  ```
-
-### Common Development Tasks - LongCat
-1. **Add video generation endpoint**:
-   - Create API route in `app/api/video/generate/route.ts`
-   - Call `client.generateVideo(request)` from `lib/providers/`
-   - Return jobId for async processing
-   
-2. **Status polling**:
-   - Use `client.getVideoStatus(videoId)` for single-shot polling
-   - Use `client.waitForCompletion(videoId)` for blocking wait with timeout
-   
-3. **Debug video generation issues**:
-   - Check `LONGCAT_API_KEY` environment variable
-   - Verify request parameters match API contract (prompt, duration, aspect_ratio, style)
-   - Use detailed error messages from client (includes status code + API response)
-
-## Critical Integration Points
-- **Instagram**: Uses Facebook Graph API v17.0 (two-step: create → publish)
-- **AI Agents**: External BEE API with streaming response handling
-- **Video Generation**: LongCat API with retry/polling, Video Provider Registry for multi-provider support
-- **Supabase**: Database integration for user data and analytics
-- **Netlify**: Static hosting with serverless functions for backend logic
-
-Last updated: 2025-11-08
+## Example
+When adding a new agent, create agents/new-agent/ with proper structure rather than mixing agent logic with UI components.

@@ -146,3 +146,6 @@ Inspired by:
 ---
 
 **Last Updated**: November 2, 2025
+
+> 🤖 See [.github/copilot-instructions.md](.github/copilot-instructions.md) for AI guidelines.
+
