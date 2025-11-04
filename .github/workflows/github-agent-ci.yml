@@ -1,0 +1,433 @@
+# GitHub PR Manager CI/CD Pipeline
+name: GitHub Agent CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'agents/github-pr-manager/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'agents/github-pr-manager/**'
+      - '.github/workflows/**'
+
+env:
+  NODE_VERSION: '18'
+  WORKING_DIR: 'agents/github-pr-manager'
+
+jobs:
+  syntax-check:
+    name: Syntax & Structure Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm ci
+
+      - name: Syntax check - index.js
+        working-directory: ${{ env.WORKING_DIR }}
+        run: node -c src/index.js
+
+      - name: Syntax check - ai-service.js
+        working-directory: ${{ env.WORKING_DIR }}
+        run: node -c src/ai-service.js
+
+      - name: Validate brace balance
+        working-directory: ${{ env.WORKING_DIR }}/src
+        shell: bash
+        run: |
+          echo "Checking brace balance in index.js..."
+          open_braces=$(grep -o '{' index.js | wc -l)
+          close_braces=$(grep -o '}' index.js | wc -l)
+          open_parens=$(grep -o '(' index.js | wc -l)
+          close_parens=$(grep -o ')' index.js | wc -l)
+          
+          echo "Braces: $open_braces open, $close_braces close"
+          echo "Parens: $open_parens open, $close_parens close"
+          
+          if [ "$open_braces" -ne "$close_braces" ]; then
+            echo "❌ Unbalanced braces detected!"
+            exit 1
+          fi
+          
+          if [ "$open_parens" -ne "$close_parens" ]; then
+            echo "❌ Unbalanced parentheses detected!"
+            exit 1
+          fi
+          
+          echo "✅ All braces and parentheses balanced"
+
+      - name: Check for duplicate functions
+        working-directory: ${{ env.WORKING_DIR }}/src
+        shell: bash
+        run: |
+          echo "Checking for duplicate function declarations..."
+          
+          # Check for duplicate queueWebhookForProcessing
+          queue_funcs=$(grep -c "function queueWebhookForProcessing\|queueWebhookForProcessing.*=" index.js || echo "0")
+          if [ "$queue_funcs" -gt 1 ]; then
+            echo "❌ Duplicate queueWebhookForProcessing function found!"
+            grep -n "queueWebhookForProcessing" index.js
+            exit 1
+          fi
+          
+          # Check for any duplicated function names
+          duplicate_funcs=$(grep -E "(function|const|let|var)\s+\w+.*=" index.js | cut -d' ' -f2 | cut -d'(' -f1 | sort | uniq -d)
+          if [ -n "$duplicate_funcs" ]; then
+            echo "❌ Duplicate function declarations found:"
+            echo "$duplicate_funcs"
+            exit 1
+          fi
+          
+          echo "✅ No duplicate functions detected"
+
+  lint-and-type-check:
+    name: Linting & Type Checking
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npx eslint src --ext .js,.ts --max-warnings=0 --format=github
+
+      - name: TypeScript type check
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npx tsc --noEmit
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm test
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [syntax-check, lint-and-type-check, unit-tests]
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: github_agent_test
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm ci
+
+      - name: Start GitHub PR Manager
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          NODE_ENV: test
+          PORT: 3001
+          GITHUB_REPOSITORY: test/test-repo
+          GITHUB_TOKEN: fake-token
+          WEBHOOK_SECRET: test-secret
+          ENABLE_AI_ANALYSIS: false
+          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/github_agent_test
+        run: |
+          node src/index.js &
+          echo $! > server.pid
+          
+          # Wait for server to start
+          for i in {1..30}; do
+            if curl -f http://localhost:3001/health > /dev/null 2>&1; then
+              echo "Server started successfully"
+              break
+            fi
+            echo "Waiting for server to start... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run webhook integration tests
+        working-directory: ${{ env.WORKING_DIR }}
+        env:
+          TEST_BASE_URL: http://localhost:3001
+          WEBHOOK_SECRET: test-secret
+        run: node webhook-integration-test.js
+
+      - name: Validate Prometheus metrics
+        run: |
+          echo "🔍 Checking metrics endpoint..."
+          curl -f http://localhost:3001/metrics
+          
+          echo "📈 Verifying webhook metrics are available..."
+          curl -s http://localhost:3001/metrics | grep -E "(github_webhooks_total|github_webhook_queue_length|github_webhook_processing_duration_seconds)" || {
+            echo "❌ Required Prometheus metrics not found"
+            exit 1
+          }
+          
+          echo "✅ All Prometheus metrics validated"
+
+      - name: Test PowerShell webhook compatibility
+        run: |
+          echo "🔧 Testing PowerShell-compatible webhook signature..."
+          
+          # Generate signature using openssl (simulates PowerShell HMAC)
+          payload='{"test":"powershell_ci_test","timestamp":"'$(date +%s)'"}'
+          secret="test-secret"
+          signature="sha256="$(echo -n "$payload" | openssl dgst -sha256 -hmac "$secret" | cut -d' ' -f2)
+          
+          echo "📡 Sending webhook with PowerShell-compatible signature..."
+          response=$(curl -s -w "%{http_code}" -o /dev/null \
+            -X POST http://localhost:3001/webhook \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: ping" \
+            -H "X-GitHub-Delivery: $(uuidgen)" \
+            -H "X-Hub-Signature-256: $signature" \
+            --data "$payload")
+          
+          if [ "$response" = "202" ]; then
+            echo "✅ PowerShell compatibility verified (HTTP $response)"
+          else
+            echo "❌ PowerShell compatibility failed (HTTP $response)"
+            exit 1
+          fi
+
+      - name: Stop server
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [syntax-check, lint-and-type-check]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          docker build -t github-pr-manager:test .
+
+      - name: Test Docker container syntax
+        run: |
+          docker run --rm github-pr-manager:test node -c src/index.js
+
+      - name: Test Docker container startup (dry run)
+        run: |
+          docker run --rm -e GITHUB_REPOSITORY=test/test \
+            -e GITHUB_TOKEN=fake-token \
+            -e WEBHOOK_SECRET=test-secret \
+            -e ENABLE_AI_ANALYSIS=false \
+            github-pr-manager:test timeout 10 node src/index.js || true
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npm audit --audit-level=moderate
+
+      - name: Check for secrets in code
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "Checking for potential secrets..."
+          
+          # Check for hardcoded tokens, passwords, etc.
+          if grep -r -E "(password|token|secret|key)\s*[:=]\s*['\"][^'\"]{8,}" src/ || true; then
+            echo "⚠️  Potential hardcoded secrets found - please review"
+          fi
+          
+          # Check for TODO/FIXME that might indicate security issues
+          security_todos=$(grep -r -i "TODO.*security\|FIXME.*security\|XXX.*security" src/ || echo "")
+          if [ -n "$security_todos" ]; then
+            echo "⚠️  Security-related TODOs found:"
+            echo "$security_todos"
+          fi
+
+  environment-check:
+    name: Environment Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check required environment variables in docker-compose
+        working-directory: agents
+        run: |
+          echo "Checking docker-compose files for required environment variables..."
+          
+          required_vars=("GITHUB_REPOSITORY" "GITHUB_TOKEN" "WEBHOOK_SECRET")
+          
+          for compose_file in docker-compose*.yml; do
+            echo "Checking $compose_file..."
+            
+            for var in "${required_vars[@]}"; do
+              if ! grep -q "\$.*$var" "$compose_file"; then
+                echo "⚠️  $var not found in $compose_file"
+              else
+                echo "✅ $var found in $compose_file"
+              fi
+            done
+          done
+
+      - name: Validate .env.example completeness
+        working-directory: ${{ env.WORKING_DIR }}
+        run: |
+          echo "Checking .env.example for completeness..."
+          
+          required_vars=("GITHUB_TOKEN" "GITHUB_REPOSITORY" "WEBHOOK_SECRET" "PORT" "NODE_ENV")
+          missing_vars=()
+          
+          for var in "${required_vars[@]}"; do
+            if ! grep -q "^$var=" .env.example; then
+              missing_vars+=("$var")
+            fi
+          done
+          
+          if [ ${#missing_vars[@]} -gt 0 ]; then
+            echo "❌ Missing variables in .env.example:"
+            printf '%s\n' "${missing_vars[@]}"
+            exit 1
+          fi
+          
+          echo "✅ All required variables present in .env.example"
+
+  deployment-check:
+    name: Deployment Readiness
+    runs-on: ubuntu-latest
+    needs: [integration-tests, docker-build, security-scan, environment-check]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deployment readiness report
+        run: |
+          echo "🚀 Deployment Readiness Report"
+          echo "=============================="
+          echo "✅ Syntax validation passed"
+          echo "✅ Linting and type checking passed"
+          echo "✅ Unit tests passed"
+          echo "✅ Integration tests passed"
+          echo "✅ Docker build successful"
+          echo "✅ Security scan completed"
+          echo "✅ Environment validation passed"
+          echo ""
+          echo "📦 Ready for deployment to production"
+          echo "🔗 Commit: ${{ github.sha }}"
+          echo "👤 Author: ${{ github.actor }}"
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🚀 CI Pipeline Results
+
+              ✅ **All checks passed!** This PR is ready for deployment.
+
+              **Validation Summary:**
+              - ✅ Syntax validation
+              - ✅ Linting & type checking  
+              - ✅ Unit tests
+              - ✅ Integration tests
+              - ✅ Docker build
+              - ✅ Security scan
+              - ✅ Environment validation
+
+              **Commit:** \`${{ github.sha }}\`
+              **Build:** [View Details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            })

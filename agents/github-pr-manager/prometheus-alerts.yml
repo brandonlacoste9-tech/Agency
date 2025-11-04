@@ -1,0 +1,260 @@
+groups:
+- name: github_pr_manager.rules
+  rules:
+  # Critical Alerts (P0 - 5min response)
+  - alert: GitHubPRManagerDown
+    expr: up{job="github_pr_manager"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      priority: P0
+    annotations:
+      summary: "GitHub PR Manager service is down"
+      description: "GitHub PR Manager has been down for more than 1 minute"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#service-down"
+      
+  - alert: WebhookQueueCritical
+    expr: github_webhook_queue_length > 500
+    for: 2m
+    labels:
+      severity: critical
+      priority: P0
+    annotations:
+      summary: "Webhook queue critically high ({{ $value }} items)"
+      description: "Webhook queue length is {{ $value }}, indicating severe processing delays"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#high-queue-length-500-items"
+      
+  - alert: WebhookErrorRateCritical
+    expr: rate(github_webhook_errors_total[5m]) / max(1, rate(github_webhooks_total[5m])) > 0.9
+    for: 2m
+    labels:
+      severity: critical
+      priority: P0
+    annotations:
+      summary: "Critical webhook error rate: {{ $value | humanizePercentage }}"
+      description: "More than 90% of webhooks are failing"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#high-error-rate-90"
+
+  # High Priority Alerts (P1 - 15min response)  
+  - alert: WebhookQueueHigh
+    expr: github_webhook_queue_length > 200
+    for: 5m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "Webhook queue backing up ({{ $value }} items)"
+      description: "Queue length is {{ $value }}. Consider scaling workers or investigating processing delays"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#high-queue-length-200-items"
+      
+  - alert: WebhookErrorRateHigh
+    expr: rate(github_webhook_errors_total[5m]) / max(1, rate(github_webhooks_total[5m])) > 0.2
+    for: 5m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "High webhook error rate: {{ $value | humanizePercentage }}"
+      description: "Error rate has exceeded 20% for 5 minutes"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#high-error-rate-20"
+      
+  - alert: WebhookProcessingSlowP1
+    expr: histogram_quantile(0.95, rate(github_webhook_processing_duration_seconds_bucket[10m])) > 30
+    for: 10m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "Webhook processing is slow (95th percentile: {{ $value }}s)"
+      description: "95th percentile processing time is {{ $value }} seconds, indicating performance issues"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#slow-processing-30s"
+
+  - alert: MemoryUsageHigh
+    expr: (process_resident_memory_bytes{job="github_pr_manager"} / 1024 / 1024) > 512
+    for: 5m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "High memory usage: {{ $value }}MB"
+      description: "Memory usage is {{ $value }}MB, approaching limits"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#memory-leak--high-memory-usage"
+
+  # Medium Priority Alerts (P2 - 1hr response)
+  - alert: WebhookQueueWarning
+    expr: github_webhook_queue_length > 100
+    for: 10m
+    labels:
+      severity: warning
+      priority: P2
+    annotations:
+      summary: "Webhook queue length elevated ({{ $value }} items)"
+      description: "Queue length is {{ $value }}, monitor for continued growth"
+      runbook_url: "https://github.com/brandonlacoste9-tech/adgenxai/blob/main/agents/github-pr-manager/OPERATIONAL_RUNBOOK.md#queue-status"
+      
+  - alert: WebhookProcessingSlow
+    expr: histogram_quantile(0.95, rate(github_webhook_processing_duration_seconds_bucket[10m])) > 10
+    for: 10m
+    labels:
+      severity: warning
+      priority: P2
+    annotations:
+      summary: "Webhook processing slower than usual (95th percentile: {{ $value }}s)"
+      description: "95th percentile processing time is {{ $value }} seconds"
+      
+  - alert: SSEConnectionsLow
+    expr: github_sse_connections_total == 0
+    for: 15m
+    labels:
+      severity: info
+      priority: P2
+    annotations:
+      summary: "No SSE connections active"
+      description: "No Server-Sent Events connections for 15 minutes, monitoring may be offline"
+      
+  - alert: WebhookErrorRateElevated
+    expr: rate(github_webhook_errors_total[5m]) / max(1, rate(github_webhooks_total[5m])) > 0.05
+    for: 10m
+    labels:
+      severity: warning
+      priority: P2
+    annotations:
+      summary: "Elevated webhook error rate: {{ $value | humanizePercentage }}"
+      description: "Error rate has exceeded 5% for 10 minutes"
+
+  # Low Priority Alerts (P3 - next business day)
+  - alert: AIAnalysisErrors
+    expr: rate(github_ai_analysis_total{status="error"}[30m]) > 0.1
+    for: 30m
+    labels:
+      severity: info
+      priority: P3
+    annotations:
+      summary: "AI analysis errors increasing"
+      description: "AI analysis error rate is {{ $value }} per second over 30 minutes"
+      
+  - alert: WebhookVolumeUnusuallyLow
+    expr: rate(github_webhooks_total[1h]) < 0.01 and on() hour() > 8 and on() hour() < 18
+    for: 1h
+    labels:
+      severity: info
+      priority: P3
+    annotations:
+      summary: "Webhook volume unusually low during business hours"
+      description: "Receiving {{ $value }} webhooks/second, may indicate GitHub integration issues"
+      
+  - alert: HealthMonitoringGaps
+    expr: increase(github_webhooks_total[5m]) == 0 and increase(github_webhooks_total[1h]) > 0
+    for: 10m
+    labels:
+      severity: info
+      priority: P3
+    annotations:
+      summary: "No webhooks received in 5 minutes (but active in last hour)"
+      description: "Possible temporary GitHub webhook delivery issue"
+
+  # Performance Degradation Alerts
+  - alert: ResponseTimeP99High
+    expr: histogram_quantile(0.99, rate(github_webhook_processing_duration_seconds_bucket[5m])) > 60
+    for: 5m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "99th percentile response time very high: {{ $value }}s"
+      description: "Response time P99 is {{ $value }} seconds, indicating severe performance issues"
+      
+  - alert: MemoryLeakSuspected
+    expr: increase(process_resident_memory_bytes{job="github_pr_manager"}[1h]) > 50 * 1024 * 1024
+    for: 1h
+    labels:
+      severity: warning
+      priority: P2
+    annotations:
+      summary: "Suspected memory leak: {{ $value | humanizeBytes }} increase in 1h"
+      description: "Memory usage has increased by {{ $value | humanizeBytes }} in the last hour"
+      
+  # Dependency Health Alerts  
+  - alert: RedisConnectionIssues
+    expr: increase(github_agent_errors_total{type="redis_connection"}[5m]) > 5
+    for: 2m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "Redis connection errors increasing"
+      description: "{{ $value }} Redis connection errors in 5 minutes"
+      
+  - alert: GitHubAPIErrors
+    expr: increase(github_agent_errors_total{type="github_api"}[5m]) > 10
+    for: 2m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "GitHub API errors increasing"
+      description: "{{ $value }} GitHub API errors in 5 minutes, may indicate rate limiting or API issues"
+      
+  - alert: AIServiceUnavailable
+    expr: increase(github_ai_analysis_total{status="error"}[5m]) > 5
+    for: 5m
+    labels:
+      severity: warning
+      priority: P2
+    annotations:
+      summary: "AI service errors increasing"
+      description: "{{ $value }} AI service errors in 5 minutes"
+
+  # Business Logic Alerts
+  - alert: WebhookSignatureFailures
+    expr: increase(github_webhook_errors_total{type="webhook_auth_failed"}[10m]) > 10
+    for: 5m
+    labels:
+      severity: warning
+      priority: P1
+    annotations:
+      summary: "Multiple webhook signature verification failures"
+      description: "{{ $value }} signature verification failures in 10 minutes - possible security issue or misconfiguration"
+      
+  - alert: UnexpectedRestarts
+    expr: increase(process_start_time_seconds{job="github_pr_manager"}[30m]) > 0
+    for: 1m
+    labels:
+      severity: warning
+      priority: P2
+    annotations:
+      summary: "GitHub PR Manager has restarted"
+      description: "Service restarted in the last 30 minutes - check logs for crash reasons"
+
+# Alerting Configuration
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+      
+# Example alertmanager.yml route configuration (for reference)
+# route:
+#   group_by: ['alertname', 'priority']
+#   group_wait: 10s
+#   group_interval: 10s
+#   repeat_interval: 1h
+#   receiver: 'web.hook'
+#   routes:
+#   - match:
+#       priority: P0
+#     receiver: 'pagerduty-critical'
+#     group_wait: 0s
+#     repeat_interval: 5m
+#   - match:
+#       priority: P1
+#     receiver: 'slack-urgent'
+#     repeat_interval: 15m
+#   - match:
+#       priority: P2
+#     receiver: 'slack-warning'
+#     repeat_interval: 1h
+#   - match:
+#       priority: P3
+#     receiver: 'email-info'
+#     repeat_interval: 24h

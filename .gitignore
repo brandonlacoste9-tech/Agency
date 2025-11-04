@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/  # Commented out - this is a Next.js project, we need lib/ for custom modules
 lib64/
 parts/
 sdist/
@@ -212,6 +212,7 @@ __marimo__/
 .netlify/
 dist/
 node_modules/
+.next/
 
 # Next.js
 .next/

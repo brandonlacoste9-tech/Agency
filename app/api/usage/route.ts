@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 interface UsageData {
   model: string;
@@ -82,11 +83,18 @@ function getModelStats(model: string): UsageData {
   const limit = DEFAULT_LIMITS[model] || 1000000;
   const today = new Date().toDateString();
 
-  const modelLogs = usageLog.filter((log) => log.model === model);
-  const totalTokens = modelLogs.reduce((sum, log) => sum + log.tokens, 0);
-  const todayTokens = modelLogs
-    .filter((log) => new Date(log.timestamp).toDateString() === today)
-    .reduce((sum, log) => sum + log.tokens, 0);
+  // Single pass through logs for better performance
+  let totalTokens = 0;
+  let todayTokens = 0;
+
+  for (const log of usageLog) {
+    if (log.model === model) {
+      totalTokens += log.tokens;
+      if (new Date(log.timestamp).toDateString() === today) {
+        todayTokens += log.tokens;
+      }
+    }
+  }
 
   const percentageUsed = Math.min(100, Math.round((todayTokens / limit) * 100));
   const remainingTokens = Math.max(0, limit - todayTokens);

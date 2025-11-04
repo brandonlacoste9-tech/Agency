@@ -1,0 +1,23 @@
+# CODEOWNERS - Production GitHub PR Manager
+# These owners will be requested for review when code in matching paths is modified
+
+# Global ownership for critical infrastructure
+* @ops-team @security-team
+
+# Core resilience and circuit breaker systems
+/src/webhook-circuit-breaker.js @core-team @ops-team
+/src/graceful-shutdown.js @core-team @ops-team
+/src/backpressure-control.js @core-team @ops-team
+
+# Security-sensitive components
+/src/admin-endpoints.js @security-team @core-team
+/src/resilient-http.js @security-team
+
+# Configuration and deployment
+/package.json @ops-team
+/Dockerfile @ops-team
+/.github/ @ops-team @security-team
+
+# Documentation
+/README.md @docs-team
+/docs/ @docs-team

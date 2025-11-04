@@ -1,0 +1,133 @@
+import { NextRequest } from "next/server";
+import { soraClient, SoraGenerationRequest } from "@/lib/sora/sora-client";
+import { telemetry, generateRequestId } from "@/lib/telemetry";
+import { selectVideoProvider, providerSelector } from "@/lib/providers/provider-selector";
+
+export const runtime = "nodejs";
+/**
+ * POST /api/sora/generate
+ * Request a video generation from Sora
+ * Returns immediately with job ID (async processing)
+ */
+export async function POST(req: NextRequest) {
+  const requestId = generateRequestId();
+  const startTime = Date.now();
+  if (prompt.length > 10000) {
+    telemetry.trackVideoResult({
+      requestId,
+      provider: 'sora',
+      status: 'validation_error',
+      latency_ms: Date.now() - startTime,
+      error: 'Prompt too long'
+    });
+    return Response.json(
+      { error: "Prompt too long (max 10000 chars)" },
+      { status: 400 }
+    );
+                { status: 400 }
+              );
+            }
+
+            const videoDuration = duration || 10;
+
+            // Use ProviderSelector to choose optimal provider (with caching support)
+            const providerSelection = await selectVideoProvider(
+              prompt.trim(),
+              videoDuration,
+              mode,
+              priority
+            );
+    
+            // Track provider selection for telemetry
+            telemetry.trackVideoRequest({
+              requestId,
+              provider: providerSelection.provider.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+              prompt_length: prompt.length,
+              duration: videoDuration,
+              model,
+              quality,
+              aspectRatio
+            });
+
+            // Create generation request
+            const request: SoraGenerationRequest = {
+              prompt: prompt.trim(),
+              model: (model as "sora-1" | "sora-1-hd") || "sora-1",
+              duration: videoDuration as any,
+              quality: quality as any,
+              aspectRatio: aspectRatio as any,
+            };
+
+            // Check if we have a cache hit first
+            if (providerSelection.cacheStatus === 'hit') {
+              // Return cached result immediately
+              return Response.json({
+                jobId: 'cached_' + Date.now(),
+                status: 'completed',
+                createdAt: new Date().toISOString(),
+                requestId,
+                provider: providerSelection.provider,
+                estimatedCost: providerSelection.estimatedCost,
+                estimatedLatency: providerSelection.estimatedLatency,
+                selectionReason: providerSelection.reason,
+                fallbackProviders: providerSelection.fallbacks,
+                cacheStatus: 'hit',
+                message: `Cached result available from ${providerSelection.provider}`,
+              });
+            }
+
+            // Submit to Sora (or selected provider)
+            const job = await soraClient.generateVideo(request);
+
+            // Cache the result for future requests
+            if (job.status === 'completed' || job.status === 'queued') {
+              await providerSelector.cacheResult(
+                {
+                  contentType: 'video',
+                  mode,
+                  duration: videoDuration,
+                  priority,
+                  prompt: prompt.trim()
+                },
+                job,
+                providerSelection.provider
+              );
+            }
+
+            // Track success
+            telemetry.trackVideoResult({
+              requestId,
+              provider: providerSelection.provider.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+              status: 'queued',
+              latency_ms: Date.now() - startTime
+            });
+
+            return Response.json({
+              jobId: job.id,
+              status: job.status,
+              createdAt: job.createdAt,
+              requestId,
+              provider: providerSelection.provider,
+              estimatedCost: providerSelection.estimatedCost,
+              estimatedLatency: providerSelection.estimatedLatency,
+              selectionReason: providerSelection.reason,
+              fallbackProviders: providerSelection.fallbacks,
+              message: `Video generation queued with ${providerSelection.provider}. Check status with /api/sora/status?jobId=...`,
+            });
+          } catch (error) {
+            // Track error
+            telemetry.trackVideoResult({
+              requestId,
+              provider: 'sora',
+              status: 'error',
+              latency_ms: Date.now() - startTime,
+              error: (error as Error).message
+            });
+    
+            return Response.json(
+              { error: (error as Error).message },
+              { status: 500 }
+            );
+          }
+        }
+      return Response.json(

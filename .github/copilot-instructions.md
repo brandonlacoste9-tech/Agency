@@ -1,74 +1,105 @@
-# Copilot Instructions for AdGenXAI - AI Sensory Cortex
+# Copilot Instructions
 
-## Project Overview
-AdGenXAI is a Next.js AI-powered advertising platform with a "Sensory Cortex" architecture. The system generates ads/reels using AI agents, publishes to social platforms via Netlify functions, and provides a polished aurora-themed UI. Think of it as a webhook-driven AI advertising automation platform.
+## Repo Context
 
-## Architecture ("Sensory Cortex" Pattern)
-- **Frontend**: Next.js 14.2+ app with static export (`output: 'export'`) for Netlify hosting
-- **Backend**: Netlify Functions act as the "sensory cortex" - serverless webhooks that orchestrate AI agents
-- **AI Integration**: External "Bee Agent" API calls for content generation
-- **Platform Publishing**: Modular platform adapters in `lib/platforms/` (Instagram, TikTok, YouTube)
-- **Deployment**: Fully automated via "BEE-SHIP" batch scripts that commit → push → auto-deploy
-- **CI/CD**: GitHub Actions with CodeQL security scanning, auto-labeling, and Copilot code reviews
-- **Tech Stack**:
-  - Next.js 14.2 with App Router
-  - TypeScript (strict mode)
-  - Tailwind CSS for styling
-  - Framer Motion for animations
-  - Vitest + Testing Library for testing
-  - Netlify for hosting & serverless functions
+This repo: **AdGenXAI**  
+Role in stack: AI-powered advertising automation platform with GitHub PR management  
+Primary runtime: Next.js 14 / TypeScript  
+Deployment: Netlify with serverless functions
 
-## Key Developer Workflows
+## Architecture Hints
 
-### Quick Development Start
-```bash
-npm run dev          # Start Next.js dev server
-npm run test:watch   # Run Vitest in watch mode
-npm run typecheck    # TypeScript validation
-npm run build        # Production build
+- **Module system**: ES6 modules with Next.js App Router
+- **Key folders**: app/ (Next.js routes), lib/ (utilities), agents/ (automation), components/ (UI)
+- **Integration points**: GitHub API, AI providers (OpenAI/GitHub Models), Netlify Blobs cache, BeeHive agent orchestration
+- **Provider selector pattern**: Intelligent AI routing based on cost, quality, latency
+- **Circuit breaker pattern**: Automatic failover when providers fail
+
+## AI Agent Rules
+
+- Extend existing utilities before adding new ones
+- All network calls must handle errors and timeouts
+- Commit style: `feat:`, `fix:`, `ci:`, `docs:`
+- Never generate or commit secrets, tokens, or API keys
+- Test changes before PR submission
+- Use provider selector for AI calls (app/lib/providers/provider-selector.ts)
+- Cache-first strategy with Netlify Blobs for cost reduction
+- All GitHub operations should use the resilient PR manager (agents/github-pr-manager/)
+
+## Critical Patterns
+
+### Provider Selection
+
+```javascript
+// Use intelligent provider selection
+import { selectProvider } from "@/lib/providers/provider-selector";
+const provider = await selectProvider({ mode: "preview", quality: "balanced" });
 ```
 
-## Copilot quick-reference — AdGenXAI (concise)
+### Cache Integration
 
-Short orientation
-- Frontend: Next.js (App Router) + Tailwind + Framer Motion (app/)
-- Backend/orchestration: Netlify functions + app/api/* serve as server endpoints and webhooks
-- AI: external "Bee Agent" API (BEE_API_URL) used for content generation
+```javascript
+// Leverage cache for cost reduction
+import {
+  getCachedResponse,
+  setCachedResponse,
+} from "@/lib/cache/cache-adapter";
+const cached = await getCachedResponse(hash);
+if (!cached) {
+  const result = await aiProvider.generate(prompt);
+  await setCachedResponse(hash, result, ttl);
+}
+```
 
-Where to look (high-value files/dirs)
-- app/ — React pages & components (app/components/*, app/api/*)
-- lib/platforms/ — platform adapters (instagram.ts, tiktok.ts) — follow the publishContent signature
-- netlify/functions/ and app/api/ — serverless webhook patterns and CORS header usage
-- docs/bee-ship/ & scripts/deployment/ — BEE-SHIP deploy conventions
+### GitHub Automation
 
-Key commands (dev & CI)
-- npm run dev           # Next dev server
-- netlify dev           # Run Netlify functions locally (test webhooks)
-- npm run build && npm run deploy  # manual build+deploy (project provides ship scripts too)
-- npm run typecheck     # TypeScript strict checks
-- npm run test / test:watch / test:ci  # Vitest suite
+```javascript
+// Use resilient GitHub PR manager
+import { GitHubPRManager } from "@/agents/github-pr-manager";
+const prManager = new GitHubPRManager();
+await prManager.processWithCircuitBreaker(webhook);
+```
 
-Project conventions you must follow
-- TypeScript strict mode and path aliases (see tsconfig.json — use @/ components/imports)
-- Use "use client" for components with state, browser APIs or Framer Motion (e.g., TopBar.tsx)
-- Netlify function pattern: always include CORS headers + handle OPTIONS. Env var: NEXT_PUBLIC_SENSORY_CORTEX_URL
-- Platform adapter contract (example):
-  export type PlatformConfig = { accountId: string; accessToken: string };
-  export async function publishContent(config: PlatformConfig, content: any): Promise<{ publishedId: string }>
+## BeeHive Integration
 
-Testing & debugging tips
-- Unit tests use Vitest + @testing-library in jsdom. Tests live under app/components/__tests__ and similar folders.
-- To test server functions locally, run `netlify dev` and POST to /.netlify/functions/<name>
-- Use abortRef pattern (PromptCard.tsx) for cancellable fetches when making agent calls
+- **Badge Ritual**: Authentication and authorization
+- **Metrics Ritual**: Performance monitoring and analytics
+- **Echo Ritual**: Learning from interactions
+- **History Ritual**: Memory and context preservation
 
-Environment and integrations
-- Look in netlify.toml and docs/ for required Netlify env vars: BEE_API_URL, BEE_API_KEY, SENSORY_CORTEX_URL, SUPABASE_*, INSTAGRAM_ACCOUNT_ID, FB_ACCESS_TOKEN
-- Social platform code in lib/platforms/ — Instagram uses Facebook Graph flow; TikTok/YouTube are implemented as adapters/stubs
+## Project-Specific Conventions
 
-Editing guidelines for AI agents
-- Make minimal, focused PRs. Run `npm run typecheck` and `npm run test` before pushing.
-- If changing APIs or platform flows, add/modify a test in vitest and a short note in docs/ or the BEE-SHIP docs.
+- **Aurora theme**: Consistent styling with Tailwind CSS and Framer Motion
+- **Cost-aware development**: Preview mode uses cheap/fast providers, production uses quality providers
+- **Sensory cortex pattern**: Webhook-driven AI orchestration
+- **Roadmap governance**: Progress tracked in docs/milestones.json with automated burndown
 
-If anything above is unclear or you want a deeper example (e.g., a walkthrough for adding a new platform adapter), tell me which area and I will expand with step-by-step examples.
+## Example Integrations
 
-Last updated: 2025-11-02
+### New AI Feature
+
+When adding new AI functionality:
+
+1. Use provider selector for routing
+2. Implement cache-first strategy
+3. Add BeeHive ritual integration
+4. Include circuit breaker for resilience
+5. Update roadmap milestone progress
+
+### GitHub Automation
+
+When extending PR automation:
+
+1. Add to agents/github-pr-manager/src/
+2. Use circuit breaker patterns
+3. Implement backpressure control
+4. Add comprehensive metrics
+5. Test with webhook suite
+
+## Avoid
+
+- Direct AI provider calls (use provider selector)
+- Uncached expensive operations
+- GitHub API calls without circuit breakers
+- Hardcoded provider configurations
+- Breaking the Aurora design system

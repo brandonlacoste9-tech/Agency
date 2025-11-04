@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 
 interface AnalyticsData {
   totalRequests: number;
@@ -166,30 +166,7 @@ export default function AnalyticsPage() {
           </h2>
           <div className="space-y-3">
             {analytics?.latencyDistribution && analytics.latencyDistribution.length > 0 ? (
-              analytics.latencyDistribution.map((bucket) => {
-                const maxCount = Math.max(
-                  ...analytics.latencyDistribution.map((b) => b.count)
-                );
-                return (
-                  <div key={bucket.bucket} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span style={{ color: "var(--text)" }}>{bucket.bucket}</span>
-                      <span className="opacity-70" style={{ color: "var(--text)" }}>
-                        {bucket.count}
-                      </span>
-                    </div>
-                    <div className="w-full bg-black/20 rounded-full h-2">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{
-                          width: `${(bucket.count / maxCount) * 100}%`,
-                          background: "linear-gradient(90deg, #10b981, #3b82f6)",
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
+              <LatencyDistributionChart distribution={analytics.latencyDistribution} />
             ) : (
               <div className="opacity-50" style={{ color: "var(--text)" }}>
                 No data available
@@ -322,3 +299,40 @@ function AnalyticsMetric({ title, value, unit, icon, change }: AnalyticsMetricPr
     </div>
   );
 }
+
+// Memoized component to prevent recalculating maxCount on every render
+const LatencyDistributionChart = React.memo(function LatencyDistributionChart({ 
+  distribution 
+}: { 
+  distribution: { bucket: string; count: number }[] 
+}) {
+  // Calculate maxCount only once when distribution changes
+  const maxCount = useMemo(
+    () => Math.max(...distribution.map((b) => b.count)),
+    [distribution]
+  );
+
+  return (
+    <>
+      {distribution.map((bucket) => (
+        <div key={bucket.bucket} className="space-y-1">
+          <div className="flex items-center justify-between text-sm">
+            <span style={{ color: "var(--text)" }}>{bucket.bucket}</span>
+            <span className="opacity-70" style={{ color: "var(--text)" }}>
+              {bucket.count}
+            </span>
+          </div>
+          <div className="w-full bg-black/20 rounded-full h-2">
+            <div
+              className="h-2 rounded-full"
+              style={{
+                width: `${(bucket.count / maxCount) * 100}%`,
+                background: "linear-gradient(90deg, #10b981, #3b82f6)",
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+});

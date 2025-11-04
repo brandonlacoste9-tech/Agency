@@ -31,8 +31,8 @@ export default function UsageBadge() {
     };
 
     fetchUsage();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUsage, 30000);
+    // Refresh every 60 seconds (reduced from 30s for better performance)
+    const interval = setInterval(fetchUsage, 60000);
     return () => clearInterval(interval);
   }, []);
 

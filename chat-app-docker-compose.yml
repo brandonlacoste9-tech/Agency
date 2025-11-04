@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  chat-app:
+    image: my-chat-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MODEL_SERVICE=llm
+      - MAX_CONVERSATIONS=100
+      - RATE_LIMIT=60
+    models:
+      - llm
+    volumes:
+      - chat_data:/app/data
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database for chat history
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=chatapp
+      - POSTGRES_USER=chatuser
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Redis for session management
+  redis:
+    image: redis:alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+models:
+  llm:
+    model: ai/smollm2
+    parameters:
+      temperature: 0.7
+      max_tokens: 1024
+      top_p: 0.9
+
+volumes:
+  chat_data:
+  postgres_data:
+  redis_data:

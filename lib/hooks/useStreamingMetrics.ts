@@ -1,64 +1,122 @@
-import { useCallback, useRef } from 'react';
+/**
+ * Hook for tracking streaming metrics
+ * Records performance metrics for AI streaming operations
+ */
+
+import { useCallback } from "react";
 
 export interface StreamingMetric {
-  timestamp: number;
-  type: 'generation' | 'persona' | 'export';
-  duration: number;
-  success: boolean;
-  metadata?: Record<string, any>;
+  timestamp?: number;
+  type?: "start" | "chunk" | "complete" | "error";
+  model?: string;
+  tokensGenerated?: number;
+  latency?: number;
+  totalDuration?: number;
+  wasAborted?: boolean;
+  status?: "success" | "error" | "aborted";
+  error?: string;
 }
 
 export function useStreamingMetrics() {
-  const metricsRef = useRef<StreamingMetric[]>([]);
+  /**
+   * Record a streaming metric
+   */
+  const recordMetric = useCallback(async (metric: StreamingMetric) => {
+    try {
+      // Add timestamp if not provided
+      const enrichedMetric = {
+        ...metric,
+        timestamp: metric.timestamp || Date.now(),
+      };
+
+      // In production, this would send metrics to an analytics endpoint
+      // For now, we'll just log to console in development
+      if (process.env.NODE_ENV === "development") {
+        console.log("[StreamingMetric]", enrichedMetric);
+      }
+
+      // Send to analytics API if configured
+      const analyticsUrl = process.env.NEXT_PUBLIC_ANALYTICS_URL;
+      if (analyticsUrl) {
+        await fetch(`${analyticsUrl}/metrics`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(enrichedMetric),
+        });
+      }
+    } catch (error) {
+      // Silently fail - we don't want metrics to break the app
+      console.error("Failed to record metric:", error);
+    }
+  }, []);
 
   /**
-   * Records a streaming metric.
-   * 
-   * All additional properties (e.g., model, latency, tokensGenerated, etc.) should be included in the `metadata` field.
-   * Example:
-   *   recordMetric({
-   *     type: 'generation',
-   *     duration: 1234,
-   *     success: true,
-   *     metadata: {
-   *       model: 'gpt-4',
-   *       latency: 1200,
-   *       tokensGenerated: 512,
-   *       wasAborted: false,
-   *       status: 'success'
-   *     }
-   *   });
+   * Record the start of a streaming operation
    */
-  const recordMetric = useCallback((metric: Omit<StreamingMetric, 'timestamp'>) => {
-    const fullMetric: StreamingMetric = {
-      ...metric,
-      timestamp: Date.now(),
-    };
-    
-    metricsRef.current.push(fullMetric);
-    
-    // Optional: log for debugging (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Streaming metric recorded:', fullMetric);
-    }
-    
-    // Keep only last 100 metrics to prevent memory leaks
-    if (metricsRef.current.length > 100) {
-      metricsRef.current = metricsRef.current.slice(-100);
-    }
-  }, []);
+  const recordStart = useCallback(
+    (model?: string) => {
+      recordMetric({
+        timestamp: Date.now(),
+        type: "start",
+        model,
+      });
+    },
+    [recordMetric]
+  );
 
-  const getMetrics = useCallback(() => {
-    return [...metricsRef.current];
-  }, []);
+  /**
+   * Record a chunk received during streaming
+   */
+  const recordChunk = useCallback(
+    (tokensGenerated: number, model?: string) => {
+      recordMetric({
+        timestamp: Date.now(),
+        type: "chunk",
+        model,
+        tokensGenerated,
+      });
+    },
+    [recordMetric]
+  );
 
-  const clearMetrics = useCallback(() => {
-    metricsRef.current = [];
-  }, []);
+  /**
+   * Record the completion of a streaming operation
+   */
+  const recordComplete = useCallback(
+    (latency: number, tokensGenerated: number, model?: string) => {
+      recordMetric({
+        timestamp: Date.now(),
+        type: "complete",
+        model,
+        latency,
+        tokensGenerated,
+      });
+    },
+    [recordMetric]
+  );
+
+  /**
+   * Record an error during streaming
+   */
+  const recordError = useCallback(
+    (error: string, model?: string) => {
+      recordMetric({
+        timestamp: Date.now(),
+        type: "error",
+        model,
+        error,
+      });
+    },
+    [recordMetric]
+  );
 
   return {
     recordMetric,
-    getMetrics,
-    clearMetrics,
-  };
+    recordStart,
+    recordChunk,
+    recordComplete,
+    recordError,
+  }
 }

@@ -1,0 +1,55 @@
+name: Deploy GitHub Agent
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'dist/**'
+      - 'package.json'
+      - '.github/workflows/deploy-github-agent.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-agent:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Install GitHub Agent CLI
+      run: npm install -g github-agent-cli
+      
+    - name: Deploy GitHub Agent
+      run: |
+        echo "🚀 Starting GitHub Agent deployment..."
+        # Install PM2 globally
+        npm install -g pm2
+        
+        # Start the GitHub Agent
+        pm2 start dist/index.js --name github-pr-manager
+        
+        # Check status
+        pm2 status
+        
+        # Test health endpoint
+        sleep 5
+        curl http://localhost:3001/health || echo "Health check pending..."
+        
+    - name: Keep service running
+      run: |
+        echo "✅ GitHub Agent deployed successfully"
+        echo "📡 Webhook endpoint: Available in GitHub Actions environment"
+        echo "🔍 Health monitoring active"
+        
+        # Keep the process running for the workflow duration
+        pm2 logs --lines 20

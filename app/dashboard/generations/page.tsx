@@ -26,25 +26,44 @@ export default function GenerationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    let pollInterval = 5000; // Start at 5 seconds
+    let timeoutId: NodeJS.Timeout | undefined;
+    
     const fetchJobs = async () => {
       try {
         const response = await fetch("/api/sora/jobs");
         if (response.ok) {
           const data = await response.json();
           setJobs(data);
+          
+          // Use exponential backoff if no active jobs
+          const hasActiveJobs = data.some((job: SoraJob) => 
+            job.status === "queued" || job.status === "processing"
+          );
+          
+          if (hasActiveJobs) {
+            pollInterval = 5000; // Fast polling for active jobs
+          } else {
+            // Exponential backoff up to 30 seconds when idle
+            pollInterval = Math.min(pollInterval * 1.5, 30000);
+          }
         }
       } catch (error) {
         console.error("Failed to load generations:", error);
+        // Slower polling on errors
+        pollInterval = Math.min(pollInterval * 2, 60000);
       } finally {
         setLoading(false);
+        // Schedule next poll
+        timeoutId = setTimeout(fetchJobs, pollInterval);
       }
     };
 
     fetchJobs();
-
-    // Poll for updates every 5 seconds
-    const interval = setInterval(fetchJobs, 5000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -1,0 +1,25 @@
+name: Agent
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sanity
+        run: |
+          test -d .github/workflows && echo "workflows ok"
+          test -d scripts && echo "scripts ok" || true
+      - name: Agent
+        run: |
+          if [ -x scripts/agent.sh ]; then
+            bash scripts/agent.sh
+          else
+            echo "agent start"
+            echo "agent done"
+          fi

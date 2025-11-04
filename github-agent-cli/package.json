@@ -1,0 +1,60 @@
+{
+  "name": "@brandonlacoste9-tech/github-agent-cli",
+  "version": "1.0.0",
+  "description": "Enterprise GitHub Automation Platform CLI Agent",
+  "main": "lib/deploy.js",
+  "bin": {
+    "github-agent": "bin/github-agent.js",
+    "gh-agent": "bin/github-agent.js"
+  },
+  "scripts": {
+    "start": "node bin/github-agent.js",
+    "test": "jest",
+    "prepare": "npm run build",
+    "build": "echo 'Build complete'",
+    "postinstall": "echo 'GitHub Agent CLI installed successfully! Run: github-agent --help'"
+  },
+  "keywords": [
+    "github",
+    "automation",
+    "cli",
+    "devops",
+    "pm2",
+    "enterprise",
+    "agent"
+  ],
+  "author": {
+    "name": "Brandon Lacoste",
+    "email": "brandon@adgenxai.com",
+    "url": "https://www.adgenxai.pro"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brandonlacoste9-tech/adgenxai.git"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "execa": "^5.1.1",
+    "ora": "^5.4.1",
+    "inquirer": "^8.2.6",
+    "fs-extra": "^11.1.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "axios-mock-adapter": "^1.22.0"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "scripts/",
+    "README.md"
+  ]
+}

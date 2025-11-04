@@ -131,8 +131,8 @@ export class LongCatClient {
         'Authorization': `Bearer ${this.config.apiKey}`,
         'Content-Type': 'application/json',
         'User-Agent': 'AdGenXAI/1.0',
-      },
-      signal: AbortSignal.timeout(this.config.timeout),
+      }
+      // signal will be set per-request using AbortController below
     };
 
     const requestOptions = { ...defaultOptions, ...options };
@@ -140,23 +140,119 @@ export class LongCatClient {
     let lastError: Error;
     
     for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
+      let timeoutId: any = null;
+      
       try {
-        const response = await fetch(url, requestOptions);
+        // Create AbortController for timeout handling
+        const controller = new AbortController();
+        timeoutId = setTimeout(() => {
+          try {
+            controller.abort();
+          } catch (e) {
+            // Ignore abort errors
+          }
+        }, this.config.timeout);
         
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
-          throw new Error(`LongCat API error: ${response.status} - ${errorData.message || errorData.error || 'Unknown error'}`);
+        let response;
+        try {
+          response = await fetch(url, {
+            ...requestOptions,
+            signal: controller.signal,
+          });
+        } finally {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
         }
         
-        return await response.json();
+        // DEBUG: helpful when running tests locally
+        if (process.env.DEBUG_LONGCAT === '1') {
+          try {
+            // eslint-disable-next-line no-console
+            console.log('DEBUG: fetch returned:', {
+              isObject: !!response && typeof response === 'object',
+              keys: response ? Object.keys(response) : null,
+              hasStatus: response && Object.prototype.hasOwnProperty.call(response, 'status'),
+              statusType: response ? typeof response.status : 'undefined',
+              statusValue: response ? response.status : undefined,
+              ok: response ? response.ok : undefined,
+              jsonType: response && response.json ? typeof response.json : 'undefined',
+            });
+          } catch (debugErr) {
+            // eslint-disable-next-line no-console
+            console.log('DEBUG: fetch debug failed:', debugErr);
+          }
+        }
+        
+        // Handle error responses
+        if (!response || !response.ok) {
+          // robustly read body
+          let errorData: any = { message: 'Unknown error' };
+          try {
+            if (response && typeof response.json === 'function') {
+              errorData = await response.json();
+            }
+          } catch (jsonErr) {
+            try {
+              const text = await (response as any).text?.();
+              if (text) {
+                try {
+                  errorData = JSON.parse(text);
+                } catch (_) {
+                  errorData = { message: text };
+                }
+              }
+            } catch (_) {
+              // swallow
+            }
+          }
+
+          // prefer numeric status if present
+          const statusVal = typeof response?.status === 'number'
+            ? response.status
+            : (response as any)?.status ?? 'unknown';
+
+          const message = (errorData && (errorData.message || errorData.error)) || response?.statusText || 'Unknown error';
+
+          const err = new Error(`LongCat API error: ${statusVal} - ${message}`);
+          (err as any).status = statusVal;
+          (err as any).responseBody = errorData;
+          throw err;
+        }
+        
+        // Handle successful responses
+        let body: any = undefined;
+        try {
+          if (response && typeof response.json === 'function') {
+            body = await response.json();
+          }
+        } catch (err) {
+          try {
+            const text = await (response as any).text?.();
+            if (text) {
+              try {
+                body = JSON.parse(text);
+              } catch (_) {
+                body = text;
+              }
+            }
+          } catch (_) {
+            // swallow
+          }
+        }
+        
+        return body;
       } catch (error) {
         lastError = error as Error;
         
-        if (attempt === this.config.retryAttempts) {
+        // Don't retry on HTTP errors (4xx/5xx), only on network/timeout errors
+        const isHttpError = (error as any).status !== undefined && typeof (error as any).status === 'number';
+        if (isHttpError || attempt === this.config.retryAttempts) {
           throw lastError;
         }
         
-        // Exponential backoff
+        // Exponential backoff for retryable errors
         const delay = Math.pow(2, attempt - 1) * 1000;
         await new Promise(resolve => setTimeout(resolve, delay));
       }

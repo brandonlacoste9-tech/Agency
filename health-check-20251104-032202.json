@@ -1,0 +1,15 @@
+{
+  "repository": {
+    "description": "AI-powered advertising solution with webhook sensory cortex",
+    "openPRs": 1,
+    "defaultBranch": "main",
+    "visibility": "PUBLIC",
+    "name": "adgenxai"
+  },
+  "performance": {
+    "prsRetrieved": 10,
+    "queryTime": 816.2304
+  },
+  "timestamp": "2025-11-04T03:22:02.6603735-05:00",
+  "cli": "C:\\Users\\north\\gh-cli\\bin\\gh.exe"
+}

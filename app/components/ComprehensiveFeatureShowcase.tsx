@@ -15,7 +15,7 @@ import {
   Layers,
   Hexagon,
   BookOpen,
-  Music
+  Workflow
 } from "lucide-react";
 
 interface Feature {
@@ -34,7 +34,7 @@ const features: Feature[] = [
     id: "campaign-orchestration",
     title: "Campaign Orchestration Engine",
     description: "Revolutionary unified platform - one API call orchestrates 11 AI models to create complete marketing campaigns automatically.",
-    icon: <Music className="w-6 h-6" />,
+    icon: <Workflow className="w-6 h-6" />,
     category: "orchestration",
     status: "live",
     highlight: true

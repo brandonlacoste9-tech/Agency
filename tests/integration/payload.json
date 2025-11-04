@@ -1,0 +1,83 @@
+{
+  "ref": "refs/heads/main",
+  "before": "0000000000000000000000000000000000000000",
+  "after": "abc123def456789012345678901234567890abcd",
+  "repository": {
+    "id": 123456789,
+    "name": "test-repo",
+    "full_name": "test-user/test-repo",
+    "private": false,
+    "owner": {
+      "name": "test-user",
+      "login": "test-user",
+      "id": 987654321,
+      "type": "User"
+    },
+    "html_url": "https://github.com/test-user/test-repo",
+    "description": "Test repository for webhook integration testing",
+    "default_branch": "main"
+  },
+  "pusher": {
+    "name": "test-user",
+    "email": "test-user@example.com"
+  },
+  "sender": {
+    "login": "test-user",
+    "id": 987654321,
+    "type": "User"
+  },
+  "commits": [
+    {
+      "id": "abc123def456789012345678901234567890abcd",
+      "tree_id": "def456abc123789012345678901234567890abcd",
+      "message": "Fix webhook processing corruption issues\n\nAdded comprehensive syntax checking and metrics collection",
+      "timestamp": "2025-11-03T12:00:00Z",
+      "author": {
+        "name": "Test User",
+        "email": "test-user@example.com",
+        "username": "test-user"
+      },
+      "committer": {
+        "name": "Test User",
+        "email": "test-user@example.com",
+        "username": "test-user"
+      },
+      "added": [
+        "src/metrics.js",
+        "tests/integration/postSignedWebhook.js"
+      ],
+      "removed": [],
+      "modified": [
+        "src/index.js",
+        ".github/workflows/ci.yml"
+      ]
+    }
+  ],
+  "head_commit": {
+    "id": "abc123def456789012345678901234567890abcd",
+    "tree_id": "def456abc123789012345678901234567890abcd",
+    "message": "Fix webhook processing corruption issues\n\nAdded comprehensive syntax checking and metrics collection",
+    "timestamp": "2025-11-03T12:00:00Z",
+    "author": {
+      "name": "Test User",
+      "email": "test-user@example.com",
+      "username": "test-user"
+    },
+    "committer": {
+      "name": "Test User",
+      "email": "test-user@example.com",
+      "username": "test-user"
+    },
+    "added": [
+      "src/metrics.js",
+      "tests/integration/postSignedWebhook.js"
+    ],
+    "removed": [],
+    "modified": [
+      "src/index.js",
+      ".github/workflows/ci.yml"
+    ]
+  },
+  "forced": false,
+  "compare": "https://github.com/test-user/test-repo/compare/000000000000...abc123def456"
+}

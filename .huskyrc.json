@@ -1,0 +1,22 @@
+{
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "node -c",
+      "eslint --fix"
+    ],
+    "*.ts": [
+      "tsc --noEmit"
+    ],
+    "*.tsx": [
+      "tsc --noEmit"
+    ],
+    "*.{js,ts,tsx}": [
+      "node scripts/check-corruption.js"
+    ]
+  }
+}

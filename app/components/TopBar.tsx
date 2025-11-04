@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { getInitialTheme, setTheme, applyTheme, Theme } from "@/lib/theme";
 
 export default function TopBar({
@@ -11,16 +11,17 @@ export default function TopBar({
   const [theme, setLocalTheme] = useState<Theme>("light");
 
   useEffect(() => {
+    // Only read from localStorage once on mount
     const t = getInitialTheme();
     setLocalTheme(t);
     applyTheme(t);
   }, []);
 
-  function toggleTheme() {
+  const toggleTheme = useCallback(() => {
     const next = theme === "light" ? "dark" : "light";
     setLocalTheme(next);
     setTheme(next);
-  }
+  }, [theme]);
 
   return (
     <header className="sticky top-0 z-40 border-b" style={{borderColor:"var(--border)", background:"color-mix(in oklab, var(--bg) 85%, transparent)"}}>

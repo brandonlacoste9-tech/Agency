@@ -1,0 +1,24 @@
+{
+  "monitoring": {
+    "max_failures": 3,
+    "interval_minutes": 15,
+    "health_check_timeout": 30
+  },
+  "repository": "brandonlacoste9-tech/adgenxai",
+  "alerts": {
+    "email_enabled": false,
+    "webhook_url": "",
+    "slack_channel": ""
+  },
+  "automation": {
+    "smart_labeling": true,
+    "auto_merge_enabled": true,
+    "performance_tracking": true,
+    "stale_pr_cleanup": true
+  },
+  "github": {
+    "custom_cli_path": "C:\\Users\\north\\gh-cli\\bin\\gh.exe",
+    "retry_count": 3,
+    "api_timeout": 30
+  }
+}

@@ -40,6 +40,26 @@
       "presentation": {
         "reveal": "silent"
       }
+    },
+    {
+      "label": "Refresh PR & Problems",
+      "type": "shell",
+      "command": "gh pr view --json mergeable,statusCheckRollup,state,mergeable && npm run typecheck",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "group": "build"
+    },
+    {
+      "label": "LongCat Smoke Test (Local)",
+      "type": "shell",
+      "command": "curl -s -X POST http://localhost:8888/.netlify/functions/sora-generate -H \"Content-Type: application/json\" -d '{\"prompt\":\"Test smoke\",\"duration\":10}' | jq",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "group": "test"
     }
   ]
 }

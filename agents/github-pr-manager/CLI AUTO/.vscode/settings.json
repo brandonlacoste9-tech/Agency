@@ -1,0 +1,16 @@
+{
+    "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+    "chat.tools.terminal.terminalProfile.windows": {
+
+    },
+    "chat.useNestedAgentsMdFiles": true,
+    "inlineChat.enableV2": true,
+    "inlineChat.notebookAgent": true,
+    "containers.contexts.description": [
+        "Description",
+        "Name"
+    ],
+    "typescript.tsserver.log": "normal",
+    "typescript.tsserver.experimental.enableProjectDiagnostics": true,
+    "typescript.tsserver.enableTracing": true
+}

@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 type Body = { model?: string; prompt?: string };
 
 export const runtime = "nodejs"; // ensure Node runtime for streaming
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const { searchParams } = new URL(req.url);
