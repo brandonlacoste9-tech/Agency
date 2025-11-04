@@ -1,0 +1,29 @@
+name: Validate System
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-system:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+
+      - name: Run validate-system.ps1 (deploy-production)
+        shell: pwsh
+        run: |
+          cd adgenxai
+          ./validate-system.ps1 -Action deploy-production
+
+      - name: Upload production readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: PRODUCTION_READINESS
+          path: adgenxai/PRODUCTION_READINESS.md
