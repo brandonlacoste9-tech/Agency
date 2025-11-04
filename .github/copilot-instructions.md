@@ -1,26 +1,105 @@
 # Copilot Instructions
 
 ## Repo Context
-This repo: **AdgenXAI Core**  
-Role in stack: Main AdgenXAI platform and agent coordination  
-Primary runtime: Node 20 / TypeScript + Next.js  
-Deployment: Netlify with agent services
+
+This repo: **AdGenXAI**  
+Role in stack: AI-powered advertising automation platform with GitHub PR management  
+Primary runtime: Next.js 14 / TypeScript  
+Deployment: Netlify with serverless functions
 
 ## Architecture Hints
+
 - **Module system**: ES6 modules with Next.js App Router
-- **Key folders**: app/ (Next.js), agents/ (AI workers), scripts/ (automation)
-- **Integration points**: GitHub APIs, AI services, webhook processing, dashboard
-- **Agent orchestration with fallback patterns**: Required for all AI operations
+- **Key folders**: app/ (Next.js routes), lib/ (utilities), agents/ (automation), components/ (UI)
+- **Integration points**: GitHub API, AI providers (OpenAI/GitHub Models), Netlify Blobs cache, BeeHive agent orchestration
+- **Provider selector pattern**: Intelligent AI routing based on cost, quality, latency
+- **Circuit breaker pattern**: Automatic failover when providers fail
 
 ## AI Agent Rules
+
 - Extend existing utilities before adding new ones
 - All network calls must handle errors and timeouts
-- Commit style: eat:, ix:, ci:, docs:
+- Commit style: `feat:`, `fix:`, `ci:`, `docs:`
 - Never generate or commit secrets, tokens, or API keys
 - Test changes before PR submission
-- Use existing agent patterns in agents/ directory
-- All external calls need error handling and timeouts
-- Maintain separation between UI (app/) and agents
+- Use provider selector for AI calls (app/lib/providers/provider-selector.ts)
+- Cache-first strategy with Netlify Blobs for cost reduction
+- All GitHub operations should use the resilient PR manager (agents/github-pr-manager/)
 
-## Example
-When adding a new agent, create agents/new-agent/ with proper structure rather than mixing agent logic with UI components.
+## Critical Patterns
+
+### Provider Selection
+
+```javascript
+// Use intelligent provider selection
+import { selectProvider } from "@/lib/providers/provider-selector";
+const provider = await selectProvider({ mode: "preview", quality: "balanced" });
+```
+
+### Cache Integration
+
+```javascript
+// Leverage cache for cost reduction
+import {
+  getCachedResponse,
+  setCachedResponse,
+} from "@/lib/cache/cache-adapter";
+const cached = await getCachedResponse(hash);
+if (!cached) {
+  const result = await aiProvider.generate(prompt);
+  await setCachedResponse(hash, result, ttl);
+}
+```
+
+### GitHub Automation
+
+```javascript
+// Use resilient GitHub PR manager
+import { GitHubPRManager } from "@/agents/github-pr-manager";
+const prManager = new GitHubPRManager();
+await prManager.processWithCircuitBreaker(webhook);
+```
+
+## BeeHive Integration
+
+- **Badge Ritual**: Authentication and authorization
+- **Metrics Ritual**: Performance monitoring and analytics
+- **Echo Ritual**: Learning from interactions
+- **History Ritual**: Memory and context preservation
+
+## Project-Specific Conventions
+
+- **Aurora theme**: Consistent styling with Tailwind CSS and Framer Motion
+- **Cost-aware development**: Preview mode uses cheap/fast providers, production uses quality providers
+- **Sensory cortex pattern**: Webhook-driven AI orchestration
+- **Roadmap governance**: Progress tracked in docs/milestones.json with automated burndown
+
+## Example Integrations
+
+### New AI Feature
+
+When adding new AI functionality:
+
+1. Use provider selector for routing
+2. Implement cache-first strategy
+3. Add BeeHive ritual integration
+4. Include circuit breaker for resilience
+5. Update roadmap milestone progress
+
+### GitHub Automation
+
+When extending PR automation:
+
+1. Add to agents/github-pr-manager/src/
+2. Use circuit breaker patterns
+3. Implement backpressure control
+4. Add comprehensive metrics
+5. Test with webhook suite
+
+## Avoid
+
+- Direct AI provider calls (use provider selector)
+- Uncached expensive operations
+- GitHub API calls without circuit breakers
+- Hardcoded provider configurations
+- Breaking the Aurora design system
