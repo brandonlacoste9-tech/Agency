@@ -1,39 +1,25 @@
-name: agent
+name: Agent
 on:
-  issues: 
-    types: [opened, edited, labeled, reopened]
-  pull_request: 
-    types: [opened, synchronize, ready_for_review, labeled]
-  workflow_dispatch: 
-    inputs:
-      test:
-        description: 'Test trigger'
-        required: false
-        default: 'true'
-
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
-
 jobs:
   run:
     runs-on: ubuntu-latest
-    env:
-      AGENT_DRY_RUN: "false"
-      ALLOW_LIST_LABELS: ""             # ← temporarily disable gating
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      GITHUB_REPOSITORY: ${{ github.repository }}
-      DELIVERY_ID: ${{ github.run_id }}
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: 
-          node-version: 20
-      - run: npm ci
-      - name: Debug event
+      - name: Sanity
         run: |
-          echo "event=$GITHUB_EVENT_NAME dry=$AGENT_DRY_RUN"
-          jq '{action:.action, labels:(.issue.labels // .pull_request.labels // [] | map(.name)), number:(.issue.number // .pull_request.number)}' "$GITHUB_EVENT_PATH" || true
-      - name: Run orchestrator
-        run: node scripts/github-agent-manager.js --ci
+          test -d .github/workflows && echo "workflows ok"
+          test -d scripts && echo "scripts ok" || true
+      - name: Agent
+        run: |
+          if [ -x scripts/agent.sh ]; then
+            bash scripts/agent.sh
+          else
+            echo "agent start"
+            echo "agent done"
+          fi
