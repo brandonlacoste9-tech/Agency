@@ -4,7 +4,12 @@ on:
     types: [opened, edited, labeled, reopened]
   pull_request: 
     types: [opened, synchronize, ready_for_review, labeled]
-  workflow_dispatch: {}   # manual trigger for testing
+  workflow_dispatch: 
+    inputs:
+      test:
+        description: 'Test trigger'
+        required: false
+        default: 'true'
 
 permissions:
   contents: read
