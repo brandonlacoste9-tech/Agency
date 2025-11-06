@@ -1,3 +1,25 @@
-node_modules
-.next
-.env*.local
+# Node.js
+node_modules/
+*.npmrc
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Dependency directories
+jspm_packages/
+
+# Next.js specific
+.next/
+out/
+
+# Build output
+dist/
+
+# Next.js cache
+.cache/
+
+# Webpack
+webpack.config.js
