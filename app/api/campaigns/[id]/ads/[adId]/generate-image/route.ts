@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-const jwt = require('jsonwebtoken')
+import { getUserIdFromToken } from '@/lib/auth'
 const connectDB = require('@/lib/mongodb')
 const Campaign = require('@/server/models/Campaign')
-
-function getUserIdFromToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('No token provided')
-  }
-
-  const token = authHeader.substring(7)
-  const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
-  return decoded.userId
-}
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +9,7 @@ export async function POST(
 ) {
   try {
     await connectDB()
-    const userId = getUserIdFromToken(request)
+    const userId = getUserIdFromToken(request.headers.get('authorization'))
     const { prompt } = await request.json()
     const { id, adId } = await params
 

@@ -15,8 +15,13 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const JWT_SECRET = process.env.JWT_SECRET
+    if (!JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is not set')
+    }
+
     const token = authHeader.substring(7)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
+    const decoded = jwt.verify(token, JWT_SECRET)
 
     const user = await User.findById(decoded.userId).select('-password')
     if (!user) {

@@ -270,11 +270,11 @@ ${ad.imageUrl ? `Image: ${ad.imageUrl}` : ''}
                       <p className="text-indigo-600 font-semibold mb-4">{ad.callToAction}</p>
 
                       {ad.imageUrl ? (
-                        <div className="mb-4">
+                        <div className="mb-4 relative w-full h-48">
                           <img
                             src={ad.imageUrl}
                             alt={ad.headline}
-                            className="w-full h-48 object-cover rounded-lg"
+                            className="w-full h-full object-cover rounded-lg"
                           />
                         </div>
                       ) : ad.imagePrompt ? (

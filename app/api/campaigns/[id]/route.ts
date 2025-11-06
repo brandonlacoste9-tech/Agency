@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-const jwt = require('jsonwebtoken')
+import { getUserIdFromToken } from '@/lib/auth'
 const connectDB = require('@/lib/mongodb')
 const Campaign = require('@/server/models/Campaign')
-
-function getUserIdFromToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('No token provided')
-  }
-
-  const token = authHeader.substring(7)
-  const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key')
-  return decoded.userId
-}
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +9,7 @@ export async function GET(
 ) {
   try {
     await connectDB()
-    const userId = getUserIdFromToken(request)
+    const userId = getUserIdFromToken(request.headers.get('authorization'))
     const { id } = await params
 
     const campaign = await Campaign.findOne({ _id: id, userId })
@@ -48,7 +36,7 @@ export async function DELETE(
 ) {
   try {
     await connectDB()
-    const userId = getUserIdFromToken(request)
+    const userId = getUserIdFromToken(request.headers.get('authorization'))
     const { id } = await params
 
     const campaign = await Campaign.findOneAndDelete({ _id: id, userId })
@@ -75,7 +63,7 @@ export async function PUT(
 ) {
   try {
     await connectDB()
-    const userId = getUserIdFromToken(request)
+    const userId = getUserIdFromToken(request.headers.get('authorization'))
     const data = await request.json()
     const { id } = await params
 

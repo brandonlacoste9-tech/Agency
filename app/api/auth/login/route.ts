@@ -25,9 +25,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const JWT_SECRET = process.env.JWT_SECRET
+    if (!JWT_SECRET) {
+      throw new Error('JWT_SECRET environment variable is not set')
+    }
+
     const token = jwt.sign(
       { userId: user._id },
-      process.env.JWT_SECRET || 'your-secret-key',
+      JWT_SECRET,
       { expiresIn: '7d' }
     )
 
