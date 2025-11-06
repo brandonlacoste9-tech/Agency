@@ -1,0 +1,13 @@
+{
+  "git.enableCommitSigning": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "copilot.chat.editor.experimental.useCodeBlocks": true,
+  "copilot.inlineSuggest.enable": true,
+  "copilot.chat.automaticallyRevealPanel": false,
+  "security.workspace.trust.enabled": true,
+  "telemetry.telemetryLevel": "off",
+  "chat.useNestedAgentsMdFiles": true
+}

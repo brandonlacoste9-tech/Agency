@@ -1,0 +1,1 @@
+module.exports = require('./Users/north/adgenxai/netlify/functions/webhook.js')

@@ -1,0 +1,66 @@
+headersOrigin = "config"
+redirectsOrigin = "config"
+plugins = []
+functionsDirectory = "C:\\Users\\north\\adgenxai\\koloni\\netlify\\functions"
+functionsDirectoryOrigin = "config"
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"
+
+[build]
+publish = "C:\\Users\\north\\adgenxai\\koloni\\.next"
+publishOrigin = "config"
+commandOrigin = "config"
+base = "C:\\Users\\north\\adgenxai\\koloni"
+command = "npm run build"
+functions = "C:\\Users\\north\\adgenxai\\koloni\\netlify\\functions"
+
+[build.environment]
+NODE_VERSION = "20"
+NPM_VERSION = "10"
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[[headers]]
+for = "/*"
+
+[headers.values]
+X-Frame-Options = "SAMEORIGIN"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+for = "/_next/static/*"
+
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/public/*"
+
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]

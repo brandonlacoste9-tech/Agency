@@ -1,0 +1,21 @@
+{
+	"siteId": "ea594cd2-a925-4f15-98fa-4c88eedd916d",
+	"geolocation": {
+		"data": {
+			"city": "Beaconsfield",
+			"country": {
+				"code": "CA",
+				"name": "Canada"
+			},
+			"subdivision": {
+				"code": "QC",
+				"name": "Quebec"
+			},
+			"timezone": "America/Toronto",
+			"latitude": 45.4348,
+			"longitude": -73.8629,
+			"postalCode": "H9W"
+		},
+		"timestamp": 1762394474830
+	}
+}

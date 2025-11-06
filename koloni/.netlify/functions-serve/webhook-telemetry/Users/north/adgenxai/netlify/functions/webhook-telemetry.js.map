@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../../../../adgenxai/netlify/functions/webhook-telemetry.ts"],
+  "sourceRoot": "C:/Users/north/AppData/Local/Temp/tmp-28196-ll02PiVLSmBE",
+  "sourcesContent": ["import type { Handler } from '@netlify/functions';\n\nexport const handler: Handler = async () => {\n  // Minimal stub telemetry (upgrade later to read from storage/logs)\n  const now = new Date();\n  const start = new Date(now.getTime() - 24*60*60*1000);\n  const data = {\n    stats: {\n      totalEvents: 1, // bump as you add storage; proves the pipe works\n      processing: {\n        mode: 'observation',\n        enabled: process.env.ENABLE_WEBHOOK_PROCESSING === 'true',\n      },\n      timeRange: {\n        start: start.toISOString(),\n        end: now.toISOString(),\n      },\n    },\n  };\n  return {\n    statusCode: 200,\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify(data),\n  };\n};\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAEO,IAAM,UAAmB,YAAY;AAE1C,QAAM,MAAM,oBAAI,KAAK;AACrB,QAAM,QAAQ,IAAI,KAAK,IAAI,QAAQ,IAAI,KAAG,KAAG,KAAG,GAAI;AACpD,QAAM,OAAO;AAAA,IACX,OAAO;AAAA,MACL,aAAa;AAAA;AAAA,MACb,YAAY;AAAA,QACV,MAAM;AAAA,QACN,SAAS,QAAQ,IAAI,8BAA8B;AAAA,MACrD;AAAA,MACA,WAAW;AAAA,QACT,OAAO,MAAM,YAAY;AAAA,QACzB,KAAK,IAAI,YAAY;AAAA,MACvB;AAAA,IACF;AAAA,EACF;AACA,SAAO;AAAA,IACL,YAAY;AAAA,IACZ,SAAS,EAAE,gBAAgB,mBAAmB;AAAA,IAC9C,MAAM,KAAK,UAAU,IAAI;AAAA,EAC3B;AACF;",
+  "names": []
+}

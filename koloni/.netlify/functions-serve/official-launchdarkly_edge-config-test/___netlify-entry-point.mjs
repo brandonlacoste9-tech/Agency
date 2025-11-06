@@ -1,0 +1,1 @@
+import * as bootstrap from './___netlify-bootstrap.mjs';export const handler = bootstrap.getLambdaHandler('./official-launchdarkly_edge-config-test.mjs')
