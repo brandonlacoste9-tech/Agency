@@ -23,3 +23,6 @@ dist/
 
 # Webpack
 webpack.config.js
+
+# TypeScript build info
+*.tsbuildinfo
