@@ -26,3 +26,7 @@ webpack.config.js
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Environment variables
+.env.local
+.env*.local
